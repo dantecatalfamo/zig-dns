@@ -22,19 +22,33 @@ pub const Header = packed struct {
     /// Specifies whether this message is a query (false), or a
     /// response (true).
     query: bool,
-    opcode: enum(u4) {
-        query = 0,
-        inverse_query = 1,
-        status_request = 2,
-        _,
-    },
+    opcode: Opcode,
     authoritative_answer: bool,
     truncation: bool,
     recursion_desired: bool,
     recursion_available: bool,
     /// Reserved
     z: u3,
-    response_code: enum(u4) {
+    response_code: ResponseCode,
+    /// The number of entries in the question section.
+    query_count: u16,
+    /// The number of resource records in the answer section.
+    answer_count: u16,
+    /// The number of name server resource records in the authority
+    /// records section.
+    name_server_count: u16,
+    /// The number of resource records in the additional records
+    /// section.
+    additional_record_count: u16,
+
+    pub const Opcode = enum(u4) {
+        query = 0,
+        inverse_query = 1,
+        status_request = 2,
+        _,
+    };
+
+    pub const ResponseCode = enum(u4) {
         no_error = 0,
         /// The name server was unable to interpret the query.
         format_error = 1,
@@ -52,29 +66,19 @@ pub const Header = packed struct {
         /// for policy reasons.
         refused = 5,
         _,
-    },
-    /// The number of entries in the question section.
-    qdcount: u16,
-    /// The number of resource records in the answer section.
-    ancount: u16,
-    /// The number of name server resource records in the authority
-    /// records section.
-    nscount: u16,
-    /// The number of resource records in the additional records
-    /// section.
-    arcount: u16,
+    };
 
     pub fn parse(bytes: []const u8) Header {
         std.debug.assert(bytes.len == @sizeOf(Header));
-        var header = @ptrCast(*Header, bytes).*;
+        var header = @ptrCast(*const Header, bytes).*;
         if (builtin.cpu.arch.endian() == .Big) {
             return header;
         }
         header.id = @byteSwap(u16, header.id);
-        header.qdcount = @byteSwap(u16, header.qdcount);
-        header.arcount = @byteSwap(u16, header.ancount);
-        header.nscount = @byteSwap(u16, header.nscount);
-        header.arcount = @byteSwap(u16, header.arcount);
+        header.query_count = @byteSwap(u16, header.query_count);
+        header.answer_count = @byteSwap(u16, header.answer_count);
+        header.name_server_count = @byteSwap(u16, header.name_server_count);
+        header.additional_record_count = @byteSwap(u16, header.additional_record_count);
         return header;
     }
 
@@ -85,14 +89,20 @@ pub const Header = packed struct {
             return @ptrCast(*[@sizeOf(Header)]u8, &header).*;
         }
         header.id = @byteSwap(u16, header.id);
-        header.qdcount = @byteSwap(u16, header.qdcount);
-        header.arcount = @byteSwap(u16, header.ancount);
-        header.nscount = @byteSwap(u16, header.nscount);
-        header.arcount = @byteSwap(u16, header.arcount);
+        header.query_count = @byteSwap(u16, header.query_count);
+        header.answer_count = @byteSwap(u16, header.answer_count);
+        header.name_server_count = @byteSwap(u16, header.name_server_count);
+        header.additional_record_count = @byteSwap(u16, header.additional_record_count);
         // return @bitCast([@sizeOf(Header)]u8, header);
         return @ptrCast(*[@sizeOf(Header)]u8, &header).*;
     }
 };
+
+test "parse simple request" {
+    const pkt = @embedFile("query.bin");
+    const header = Header.parse(pkt[0..@sizeOf(Header)]);
+    std.debug.print("\nparsed: {}\n", .{ header });
+}
 
 pub const Question = struct {
     qname: DomainName,
