@@ -86,10 +86,6 @@ const QClass = enum (u16) {
     @"*" = 255,
 };
 
-const RData = union(enum) {
-
-};
-
 const DomainName = []Label;
 
 const Label = struct {
@@ -97,130 +93,201 @@ const Label = struct {
     string: []const u8,
 };
 
-const CNAME = struct {
-    /// A domain name which specifies the canonical or primary name
-    /// for the owner. The owner name is an alias.
-    cname: DomainName,
+const RData = union(enum) {
+    cname: CNAME,
+    hinfo: HINFO,
+    mb: MB,
+    md: MD,
+    mf: MF,
+    mg: MG,
+    minfo: MINFO,
+    mr: MR,
+    mx: MX,
+    @"null": NULL,
+    ns: NS,
+    ptr: PTR,
+    soa: SOA,
+    txt: TXT,
+    a: A,
+    wks: WKS,
+
+    const CNAME = struct {
+        /// A domain name which specifies the canonical or primary name
+        /// for the owner. The owner name is an alias.
+        cname: DomainName,
+    };
+
+    const HINFO = struct {
+        /// A string which specifies the CPU type.
+        cpu: []const u8,
+        /// A string which specifies the operating system type.
+        os:  []const u8,
+    };
+
+    const MB = struct {
+        /// A domain name which specifies a host which has the specified
+        /// mailbox.
+        madname: DomainName,
+    };
+
+    const MD = struct {
+        /// A domain name which specifies a host which has a mail agent
+        /// for the domain which should be able to deliver mail for the
+        /// domain.
+        madname: DomainName,
+    };
+
+    const MF = struct {
+        /// A domain name which specifies a host which has a mail agent
+        /// for the domain which will accept mail for forwarding to the
+        /// domain.
+        madname: DomainName,
+    };
+
+    const MG = struct {
+        /// A domain name which specifies a mailbox which is a member of
+        /// the mail group specified by the domain name.
+        madname: DomainName,
+    };
+
+    const MINFO = struct {
+        /// A domain name which specifies a mailbox which is responsible
+        /// for the mailing list or mailbox. If this domain name names the
+        /// root, the owner of the MINFO RR is responsible for itself.
+        /// Note that many existing mailing lists use a mailbox X-request
+        /// for the RMAILBX field of mailing list X, e.g., Msgroup-request
+        /// for Msgroup. This field provides a more general mechanism.
+        rmailbx: DomainName,
+        /// A domain name which specifies a mailbox which is to receive
+        /// error messages related to the mailing list or mailbox
+        /// specified by the owner of the MINFO RR (similar to the
+        /// ERRORS-TO: field which has been proposed). If this domain name
+        /// names the root, errors should be returned to the sender of the
+        /// message.
+        emailbx: DomainName,
+    };
+
+    const MR = struct {
+        /// A domain name which specifies a mailbox which is the proper
+        /// rename of the specified mailbox.
+        madname: DomainName,
+    };
+
+    const MX = struct {
+        /// A 16 bit integer which specifies the preference given to this
+        /// RR among others at the same owner. Lower values are preferred.
+        preference: u16,
+        /// A domain name which specifies a host willing to act as a
+        /// mail exchange for the owner name.
+        exchange: DomainName,
+    };
+
+    const NULL = []const u8;
+
+    const NS = struct {
+        /// A domain name which specifies a host which should be
+        /// authoritative for the specified class and domain.
+        nsdname: DomainName,
+    };
+
+    const PTR = struct {
+        /// A domain name which points to some location in the domain name
+        /// space.
+        ptrdname: DomainName,
+    };
+
+    const SOA = struct {
+        /// The domain name of the name server that was the original or
+        /// primary source of data for this zone.
+        mname: DomainName,
+        /// A domain name which specifies the mailbox of the person
+        /// responsible for this zone.
+        rname: DomainName,
+        /// The version number of the original copy of the zone. Zone
+        /// transfers preserve this value. This value wraps and should be
+        /// compared using sequence space arithmetic.
+        serial: u32,
+        /// A time interval before the zone should be refreshed.
+        refresh: i32,
+        /// A time interval that should elapse before a failed refresh
+        /// should be retried.
+        retry: i32,
+        /// A value that specifies the upper limit on the time interval
+        /// that can elapse before the zone is no longer authoritative.
+        expire: i32,
+        /// The minimum TTL field that should be exported with any RR from
+        /// this zone.
+        minimum: u32,
+    };
+
+    const TXT = struct {
+        /// One or more strings.
+        txt_data: []const u8,
+    };
+
+    const A = struct {
+        /// An internet address
+        address: std.net.Ip4Address,
+    };
+
+    const WKS = struct {
+        /// An internet address
+        address: std.net.Ip4Address,
+        /// An IP protocol number
+        protocol: u8,
+        /// A variable length bit map.
+        bit_map: []const u8,
+    };
 };
 
-const HINFO = struct {
-    /// A string which specifies the CPU type.
-    cpu: []const u8,
-    /// A string which specifies the operating system type.
-    os:  []const u8,
-};
-
-const MB = struct {
-    /// A domain name which specifies a host which has the specified
-    /// mailbox.
-    madname: DomainName,
-};
-
-const MD = struct {
-    /// A domain name which specifies a host which has a mail agent
-    /// for the domain which should be able to deliver mail for the
-    /// domain.
-    madname: DomainName,
-};
-
-const MF = struct {
-    /// A domain name which specifies a host which has a mail agent
-    /// for the domain which will accept mail for forwarding to the
-    /// domain.
-    madname: DomainName,
-};
-
-const MG = struct {
-    /// A domain name which specifies a mailbox which is a member of
-    /// the mail group specified by the domain name.
-    madname: DomainName,
-};
-
-const MINFO = struct {
-    /// A domain name which specifies a mailbox which is responsible
-    /// for the mailing list or mailbox. If this domain name names the
-    /// root, the owner of the MINFO RR is responsible for itself.
-    /// Note that many existing mailing lists use a mailbox X-request
-    /// for the RMAILBX field of mailing list X, e.g., Msgroup-request
-    /// for Msgroup. This field provides a more general mechanism.
-    rmailbx: DomainName,
-    /// A domain name which specifies a mailbox which is to receive
-    /// error messages related to the mailing list or mailbox
-    /// specified by the owner of the MINFO RR (similar to the
-    /// ERRORS-TO: field which has been proposed). If this domain name
-    /// names the root, errors should be returned to the sender of the
-    /// message.
-    emailbx: DomainName,
-};
-
-const MR = struct {
-    /// A domain name which specifies a mailbox which is the proper
-    /// rename of the specified mailbox.
-    madname: DomainName,
-};
-
-const MX = struct {
-    /// A 16 bit integer which specifies the preference given to this
-    /// RR among others at the same owner. Lower values are preferred.
-    preference: u16,
-    /// A domain name which specifies a host willing to act as a
-    /// mail exchange for the owner name.
-    exchange: DomainName,
-};
-
-const NULL = []const u8;
-
-const NS = struct {
-    /// A domain name which specifies a host which should be
-    /// authoritative for the specified class and domain.
-    nsdname: DomainName,
-};
-
-const PTR = struct {
-    /// A domain name which points to some location in the domain name
-    /// space.
-    ptrdname: DomainName,
-};
-
-const SOA = struct {
-    /// The domain name of the name server that was the original or
-    /// primary source of data for this zone.
-    mname: DomainName,
-    /// A domain name which specifies the mailbox of the person
-    /// responsible for this zone.
-    rname: DomainName,
-    /// The version number of the original copy of the zone. Zone
-    /// transfers preserve this value. This value wraps and should be
-    /// compared using sequence space arithmetic.
-    serial: u32,
-    /// A time interval before the zone should be refreshed.
-    refresh: i32,
-    /// A time interval that should elapse before a failed refresh
-    /// should be retried.
-    retry: i32,
-    /// A value that specifies the upper limit on the time interval
-    /// that can elapse before the zone is no longer authoritative.
-    expire: i32,
-    /// The minimum TTL field that should be exported with any RR from
-    /// this zone.
-    minimum: u32,
-};
-
-const TXT = struct {
-    /// One or more strings.
-    txt_data: []const u8,
-};
-
-const A = struct {
-    /// An internet address
-    address: std.net.Ip4Address,
-};
-
-const WKS = struct {
-    /// An internet address
-    address: std.net.Ip4Address,
-    /// An IP protocol number
-    protocol: u8,
-    /// A variable length bit map.
-    bit_map: []const u8,
+const Header = packed struct {
+    /// An identifier assigned by the program that generates any kind
+    /// of query. This identifier is copied the corresponding reply
+    /// and can be used by the requester to match up replies to
+    /// outstanding queries.
+    id: u16,
+    /// Specifies whether this message is a query (false), or a
+    /// response (true).
+    query: bool,
+    opcode: enum(u4) {
+        query = 0,
+        inverse_query = 1,
+        status_request = 2,
+        _,
+    },
+    authoritative_answer: bool,
+    truncation: bool,
+    recursion_desired: bool,
+    recursion_available: bool,
+    /// Reserved
+    z: u3,
+    response_code: enum(u4) {
+        no_error = 0,
+        /// The name server was unable to interpret the query.
+        format_error = 1,
+        /// The name server was unable to process this query due to a
+        /// problem with the name server.
+        server_failure = 2,
+        /// Meaningful only for responses from an authoritative name
+        /// server, this code signifies that the domain name
+        /// referenced in the query does not exist.
+        name_error = 3,
+        ///  The name server does not support the requested kind of
+        ///  query.
+        not_implemented = 4,
+        /// The name server refuses to perform the specified operation
+        /// for policy reasons.
+        refused = 5,
+        _,
+    },
+    /// The number of entries in the question section.
+    qdcount: u16,
+    /// The number of resource records in the answer section.
+    ancount: u16,
+    /// The number of name server resource records in the authority
+    /// records section.
+    nscount: u16,
+    /// The number of resource records in the additional records
+    /// section.
+    arcount: u16,
 };
