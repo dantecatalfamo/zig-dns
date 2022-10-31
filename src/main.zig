@@ -98,10 +98,21 @@ pub const Header = packed struct {
     }
 };
 
-test "parse simple request" {
+test "Header.parse simple request" {
     const pkt = @embedFile("query.bin");
     const header = Header.parse(pkt[0..@sizeOf(Header)]);
-    std.debug.print("\nparsed: {}\n", .{ header });
+    try std.testing.expectEqual(@as(u16, 1), header.query_count);
+    try std.testing.expectEqual(@as(u16, 0), header.name_server_count);
+    try std.testing.expectEqual(@as(u16, 23002), header.id);
+}
+
+test "Header.to_bytes reverses parse" {
+    const pkt = @embedFile("query.bin");
+    const header = Header.parse(pkt[0..@sizeOf(Header)]);
+    const bytes = header.to_bytes();
+    try std.testing.expectEqualSlices(u8, pkt[0..@sizeOf(Header)], &bytes);
+    const header2 = Header.parse(&bytes);
+    try std.testing.expectEqual(header, header2);
 }
 
 pub const Question = struct {
