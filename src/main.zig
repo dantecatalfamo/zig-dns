@@ -6,8 +6,8 @@ pub fn main() anyerror!void {
 
 const RR = struct {
     name: []const u8,
-    @"type": RR_Type,
-    class: RR_Class,
+    @"type": Type,
+    class: Class,
     ttl: i32,
     rd_length: u16,
     rdata: []const u8,
@@ -15,7 +15,7 @@ const RR = struct {
 
 
 /// DNS Resource Record types
-const RR_Type = enum (u16) {
+const Type = enum (u16) {
     /// A host address
     A = 1,
     /// An authoritative name server
@@ -53,7 +53,7 @@ const RR_Type = enum (u16) {
 };
 
 /// QTYPES are a superset of TYPEs, hence all TYPEs are valid QTYPEs.
-const RR_Qtypes = enum (u16) {
+const QTypes = enum (u16) {
     /// A request for a transfer of an entire zone
     AXFR = 252,
     /// A request for mailbox-related records (MB, MG or MR)
@@ -67,7 +67,7 @@ const RR_Qtypes = enum (u16) {
 };
 
 /// DNS Resource Record Classes
-const RR_Class = enum (u16) {
+const Class = enum (u16) {
     /// The Internet
     IN = 1,
     /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs)
@@ -81,7 +81,146 @@ const RR_Class = enum (u16) {
 };
 
 /// QCLASS values are a superset of CLASS values; every CLASS is a valid QCLASS.
-const RR_QClass = enum (u16) {
+const QClass = enum (u16) {
     /// Any Class
     @"*" = 255,
+};
+
+const RData = union(enum) {
+
+};
+
+const DomainName = []Label;
+
+const Label = struct {
+    length: u8,
+    string: []const u8,
+};
+
+const CNAME = struct {
+    /// A domain name which specifies the canonical or primary name
+    /// for the owner. The owner name is an alias.
+    cname: DomainName,
+};
+
+const HINFO = struct {
+    /// A string which specifies the CPU type.
+    cpu: []const u8,
+    /// A string which specifies the operating system type.
+    os:  []const u8,
+};
+
+const MB = struct {
+    /// A domain name which specifies a host which has the specified
+    /// mailbox.
+    madname: DomainName,
+};
+
+const MD = struct {
+    /// A domain name which specifies a host which has a mail agent
+    /// for the domain which should be able to deliver mail for the
+    /// domain.
+    madname: DomainName,
+};
+
+const MF = struct {
+    /// A domain name which specifies a host which has a mail agent
+    /// for the domain which will accept mail for forwarding to the
+    /// domain.
+    madname: DomainName,
+};
+
+const MG = struct {
+    /// A domain name which specifies a mailbox which is a member of
+    /// the mail group specified by the domain name.
+    madname: DomainName,
+};
+
+const MINFO = struct {
+    /// A domain name which specifies a mailbox which is responsible
+    /// for the mailing list or mailbox. If this domain name names the
+    /// root, the owner of the MINFO RR is responsible for itself.
+    /// Note that many existing mailing lists use a mailbox X-request
+    /// for the RMAILBX field of mailing list X, e.g., Msgroup-request
+    /// for Msgroup. This field provides a more general mechanism.
+    rmailbx: DomainName,
+    /// A domain name which specifies a mailbox which is to receive
+    /// error messages related to the mailing list or mailbox
+    /// specified by the owner of the MINFO RR (similar to the
+    /// ERRORS-TO: field which has been proposed). If this domain name
+    /// names the root, errors should be returned to the sender of the
+    /// message.
+    emailbx: DomainName,
+};
+
+const MR = struct {
+    /// A domain name which specifies a mailbox which is the proper
+    /// rename of the specified mailbox.
+    madname: DomainName,
+};
+
+const MX = struct {
+    /// A 16 bit integer which specifies the preference given to this
+    /// RR among others at the same owner. Lower values are preferred.
+    preference: u16,
+    /// A domain name which specifies a host willing to act as a
+    /// mail exchange for the owner name.
+    exchange: DomainName,
+};
+
+const NULL = []const u8;
+
+const NS = struct {
+    /// A domain name which specifies a host which should be
+    /// authoritative for the specified class and domain.
+    nsdname: DomainName,
+};
+
+const PTR = struct {
+    /// A domain name which points to some location in the domain name
+    /// space.
+    ptrdname: DomainName,
+};
+
+const SOA = struct {
+    /// The domain name of the name server that was the original or
+    /// primary source of data for this zone.
+    mname: DomainName,
+    /// A domain name which specifies the mailbox of the person
+    /// responsible for this zone.
+    rname: DomainName,
+    /// The version number of the original copy of the zone. Zone
+    /// transfers preserve this value. This value wraps and should be
+    /// compared using sequence space arithmetic.
+    serial: u32,
+    /// A time interval before the zone should be refreshed.
+    refresh: i32,
+    /// A time interval that should elapse before a failed refresh
+    /// should be retried.
+    retry: i32,
+    /// A value that specifies the upper limit on the time interval
+    /// that can elapse before the zone is no longer authoritative.
+    expire: i32,
+    /// The minimum TTL field that should be exported with any RR from
+    /// this zone.
+    minimum: u32,
+};
+
+const TXT = struct {
+    /// One or more strings.
+    txt_data: []const u8,
+};
+
+const A = struct {
+    /// An internet address
+    address: std.net.Ip4Address,
+};
+
+const WKS = struct {
+    /// An internet address
+    address: std.net.Ip4Address,
+    /// An IP protocol number
+    protocol: u8,
+    /// A variable length bit map.
+    bit_map: []const u8,
 };
