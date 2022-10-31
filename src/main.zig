@@ -128,8 +128,8 @@ pub const ResourceRecord = struct {
     @"type": Type,
     class: Class,
     ttl: i32,
-    rd_length: u16,
-    rdata: []const u8,
+    resource_data_length: u16,
+    resource_data: ResourceData,
 };
 
 /// DNS Resource Record types
