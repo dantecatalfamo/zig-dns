@@ -4,15 +4,80 @@ pub fn main() anyerror!void {
     std.log.info("All your codebase are belong to us.", .{});
 }
 
-const RR = struct {
-    name: []const u8,
+const Message = struct {
+    header: Header,
+    question: []Question,
+    answer: []ResourceRecord,
+    authority: []ResourceRecord,
+    Additional: []ResourceRecord,
+};
+
+const Header = packed struct {
+    /// An identifier assigned by the program that generates any kind
+    /// of query. This identifier is copied the corresponding reply
+    /// and can be used by the requester to match up replies to
+    /// outstanding queries.
+    id: u16,
+    /// Specifies whether this message is a query (false), or a
+    /// response (true).
+    query: bool,
+    opcode: enum(u4) {
+        query = 0,
+        inverse_query = 1,
+        status_request = 2,
+        _,
+    },
+    authoritative_answer: bool,
+    truncation: bool,
+    recursion_desired: bool,
+    recursion_available: bool,
+    /// Reserved
+    z: u3,
+    response_code: enum(u4) {
+        no_error = 0,
+        /// The name server was unable to interpret the query.
+        format_error = 1,
+        /// The name server was unable to process this query due to a
+        /// problem with the name server.
+        server_failure = 2,
+        /// Meaningful only for responses from an authoritative name
+        /// server, this code signifies that the domain name
+        /// referenced in the query does not exist.
+        name_error = 3,
+        ///  The name server does not support the requested kind of
+        ///  query.
+        not_implemented = 4,
+        /// The name server refuses to perform the specified operation
+        /// for policy reasons.
+        refused = 5,
+        _,
+    },
+    /// The number of entries in the question section.
+    qdcount: u16,
+    /// The number of resource records in the answer section.
+    ancount: u16,
+    /// The number of name server resource records in the authority
+    /// records section.
+    nscount: u16,
+    /// The number of resource records in the additional records
+    /// section.
+    arcount: u16,
+};
+
+const Question = struct {
+    qname: DomainName,
+    qtype: QType,
+    qclass: QClass,
+};
+
+const ResourceRecord = struct {
+    name: DomainName,
     @"type": Type,
     class: Class,
     ttl: i32,
     rd_length: u16,
     rdata: []const u8,
 };
-
 
 /// DNS Resource Record types
 const Type = enum (u16) {
@@ -53,7 +118,7 @@ const Type = enum (u16) {
 };
 
 /// QTYPES are a superset of TYPEs, hence all TYPEs are valid QTYPEs.
-const QTypes = enum (u16) {
+const QType = enum (u16) {
     /// A request for a transfer of an entire zone
     AXFR = 252,
     /// A request for mailbox-related records (MB, MG or MR)
@@ -86,6 +151,11 @@ const QClass = enum (u16) {
     @"*" = 255,
 };
 
+/// A domain name represented as a sequence of labels, where each
+/// label consists of a length octet followed by that number of
+/// octets. The domain name terminates with the zero length octet for
+/// the null label of the root. Note that this field may be an odd
+/// number of octets; no padding is used.
 const DomainName = []Label;
 
 const Label = struct {
@@ -93,7 +163,7 @@ const Label = struct {
     string: []const u8,
 };
 
-const RData = union(enum) {
+const ResourceData = union(enum) {
     cname: CNAME,
     hinfo: HINFO,
     mb: MB,
@@ -238,56 +308,4 @@ const RData = union(enum) {
         /// A variable length bit map.
         bit_map: []const u8,
     };
-};
-
-const Header = packed struct {
-    /// An identifier assigned by the program that generates any kind
-    /// of query. This identifier is copied the corresponding reply
-    /// and can be used by the requester to match up replies to
-    /// outstanding queries.
-    id: u16,
-    /// Specifies whether this message is a query (false), or a
-    /// response (true).
-    query: bool,
-    opcode: enum(u4) {
-        query = 0,
-        inverse_query = 1,
-        status_request = 2,
-        _,
-    },
-    authoritative_answer: bool,
-    truncation: bool,
-    recursion_desired: bool,
-    recursion_available: bool,
-    /// Reserved
-    z: u3,
-    response_code: enum(u4) {
-        no_error = 0,
-        /// The name server was unable to interpret the query.
-        format_error = 1,
-        /// The name server was unable to process this query due to a
-        /// problem with the name server.
-        server_failure = 2,
-        /// Meaningful only for responses from an authoritative name
-        /// server, this code signifies that the domain name
-        /// referenced in the query does not exist.
-        name_error = 3,
-        ///  The name server does not support the requested kind of
-        ///  query.
-        not_implemented = 4,
-        /// The name server refuses to perform the specified operation
-        /// for policy reasons.
-        refused = 5,
-        _,
-    },
-    /// The number of entries in the question section.
-    qdcount: u16,
-    /// The number of resource records in the answer section.
-    ancount: u16,
-    /// The number of name server resource records in the authority
-    /// records section.
-    nscount: u16,
-    /// The number of resource records in the additional records
-    /// section.
-    arcount: u16,
 };
