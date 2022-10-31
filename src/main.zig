@@ -85,25 +85,27 @@ pub const Header = packed struct {
     pub fn to_bytes(self: *const Header) [@sizeOf(Header)]u8 {
         var header = self.*;
         if (builtin.cpu.arch.endian() == .Big) {
-            // return @bitCast([@sizeOf(Header)]u8, header);
-            return @ptrCast(*[@sizeOf(Header)]u8, &header).*;
+            return @bitCast([@sizeOf(Header)]u8, header);
         }
         header.id = @byteSwap(u16, header.id);
         header.query_count = @byteSwap(u16, header.query_count);
         header.answer_count = @byteSwap(u16, header.answer_count);
         header.name_server_count = @byteSwap(u16, header.name_server_count);
         header.additional_record_count = @byteSwap(u16, header.additional_record_count);
-        // return @bitCast([@sizeOf(Header)]u8, header);
-        return @ptrCast(*[@sizeOf(Header)]u8, &header).*;
+        return @bitCast([@sizeOf(Header)]u8, header);
     }
 };
 
 test "Header.parse simple request" {
     const pkt = @embedFile("query.bin");
     const header = Header.parse(pkt[0..@sizeOf(Header)]);
+    try std.testing.expectEqual(@as(u16, 23002), header.id);
+    try std.testing.expectEqual(true, header.query);
+    try std.testing.expectEqual(Header.Opcode.query, header.opcode);
+    try std.testing.expectEqual(false, header.authoritative_answer);
+    try std.testing.expectEqual(false, header.truncation);
     try std.testing.expectEqual(@as(u16, 1), header.query_count);
     try std.testing.expectEqual(@as(u16, 0), header.name_server_count);
-    try std.testing.expectEqual(@as(u16, 23002), header.id);
 }
 
 test "Header.to_bytes reverses parse" {
