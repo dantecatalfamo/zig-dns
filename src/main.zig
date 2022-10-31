@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub fn main() anyerror!void {
     std.log.info("All your codebase are belong to us.", .{});
@@ -62,6 +63,35 @@ pub const Header = packed struct {
     /// The number of resource records in the additional records
     /// section.
     arcount: u16,
+
+    pub fn parse(bytes: []const u8) Header {
+        std.debug.assert(bytes.len == @sizeOf(Header));
+        var header = @ptrCast(*Header, bytes).*;
+        if (builtin.cpu.arch.endian() == .Big) {
+            return header;
+        }
+        header.id = @byteSwap(u16, header.id);
+        header.qdcount = @byteSwap(u16, header.qdcount);
+        header.arcount = @byteSwap(u16, header.ancount);
+        header.nscount = @byteSwap(u16, header.nscount);
+        header.arcount = @byteSwap(u16, header.arcount);
+        return header;
+    }
+
+    pub fn to_bytes(self: *const Header) [@sizeOf(Header)]u8 {
+        var header = self.*;
+        if (builtin.cpu.arch.endian() == .Big) {
+            // return @bitCast([@sizeOf(Header)]u8, header);
+            return @ptrCast(*[@sizeOf(Header)]u8, &header).*;
+        }
+        header.id = @byteSwap(u16, header.id);
+        header.qdcount = @byteSwap(u16, header.qdcount);
+        header.arcount = @byteSwap(u16, header.ancount);
+        header.nscount = @byteSwap(u16, header.nscount);
+        header.arcount = @byteSwap(u16, header.arcount);
+        // return @bitCast([@sizeOf(Header)]u8, header);
+        return @ptrCast(*[@sizeOf(Header)]u8, &header).*;
+    }
 };
 
 pub const Question = struct {
