@@ -4,7 +4,7 @@ pub fn main() anyerror!void {
     std.log.info("All your codebase are belong to us.", .{});
 }
 
-const Message = struct {
+pub const Message = struct {
     header: Header,
     question: []Question,
     answer: []ResourceRecord,
@@ -12,7 +12,7 @@ const Message = struct {
     Additional: []ResourceRecord,
 };
 
-const Header = packed struct {
+pub const Header = packed struct {
     /// An identifier assigned by the program that generates any kind
     /// of query. This identifier is copied the corresponding reply
     /// and can be used by the requester to match up replies to
@@ -64,13 +64,13 @@ const Header = packed struct {
     arcount: u16,
 };
 
-const Question = struct {
+pub const Question = struct {
     qname: DomainName,
     qtype: QType,
     qclass: QClass,
 };
 
-const ResourceRecord = struct {
+pub const ResourceRecord = struct {
     name: DomainName,
     @"type": Type,
     class: Class,
@@ -80,7 +80,7 @@ const ResourceRecord = struct {
 };
 
 /// DNS Resource Record types
-const Type = enum (u16) {
+pub const Type = enum (u16) {
     /// A host address
     A = 1,
     /// An authoritative name server
@@ -118,7 +118,7 @@ const Type = enum (u16) {
 };
 
 /// QTYPES are a superset of TYPEs, hence all TYPEs are valid QTYPEs.
-const QType = enum (u16) {
+pub const QType = enum (u16) {
     /// A request for a transfer of an entire zone
     AXFR = 252,
     /// A request for mailbox-related records (MB, MG or MR)
@@ -132,7 +132,7 @@ const QType = enum (u16) {
 };
 
 /// DNS Resource Record Classes
-const Class = enum (u16) {
+pub const Class = enum (u16) {
     /// The Internet
     IN = 1,
     /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs)
@@ -146,7 +146,7 @@ const Class = enum (u16) {
 };
 
 /// QCLASS values are a superset of CLASS values; every CLASS is a valid QCLASS.
-const QClass = enum (u16) {
+pub const QClass = enum (u16) {
     /// Any Class
     @"*" = 255,
 };
@@ -156,10 +156,12 @@ const QClass = enum (u16) {
 /// octets. The domain name terminates with the zero length octet for
 /// the null label of the root. Note that this field may be an odd
 /// number of octets; no padding is used.
-const DomainName = []Label;
+pub const DomainName = struct {
+    labels: []Label,
+};
 
 // TODO: Proper label compression
-const Label = struct {
+pub const Label = struct {
     options: enum(u2) {
         not_compressed = 0,
         compressed = 0b11,
@@ -169,7 +171,7 @@ const Label = struct {
     string: []const u8,
 };
 
-const ResourceData = union(enum) {
+pub const ResourceData = union(enum) {
     cname: CNAME,
     hinfo: HINFO,
     mb: MB,
@@ -187,46 +189,46 @@ const ResourceData = union(enum) {
     a: A,
     wks: WKS,
 
-    const CNAME = struct {
+    pub const CNAME = struct {
         /// A domain name which specifies the canonical or primary name
         /// for the owner. The owner name is an alias.
         cname: DomainName,
     };
 
-    const HINFO = struct {
+    pub const HINFO = struct {
         /// A string which specifies the CPU type.
         cpu: []const u8,
         /// A string which specifies the operating system type.
         os:  []const u8,
     };
 
-    const MB = struct {
+    pub const MB = struct {
         /// A domain name which specifies a host which has the specified
         /// mailbox.
         madname: DomainName,
     };
 
-    const MD = struct {
+    pub const MD = struct {
         /// A domain name which specifies a host which has a mail agent
         /// for the domain which should be able to deliver mail for the
         /// domain.
         madname: DomainName,
     };
 
-    const MF = struct {
+    pub const MF = struct {
         /// A domain name which specifies a host which has a mail agent
         /// for the domain which will accept mail for forwarding to the
         /// domain.
         madname: DomainName,
     };
 
-    const MG = struct {
+    pub const MG = struct {
         /// A domain name which specifies a mailbox which is a member of
         /// the mail group specified by the domain name.
         madname: DomainName,
     };
 
-    const MINFO = struct {
+    pub const MINFO = struct {
         /// A domain name which specifies a mailbox which is responsible
         /// for the mailing list or mailbox. If this domain name names the
         /// root, the owner of the MINFO RR is responsible for itself.
@@ -243,13 +245,13 @@ const ResourceData = union(enum) {
         emailbx: DomainName,
     };
 
-    const MR = struct {
+    pub const MR = struct {
         /// A domain name which specifies a mailbox which is the proper
         /// rename of the specified mailbox.
         madname: DomainName,
     };
 
-    const MX = struct {
+    pub const MX = struct {
         /// A 16 bit integer which specifies the preference given to this
         /// RR among others at the same owner. Lower values are preferred.
         preference: u16,
@@ -258,21 +260,21 @@ const ResourceData = union(enum) {
         exchange: DomainName,
     };
 
-    const NULL = []const u8;
+    pub const NULL = []const u8;
 
-    const NS = struct {
+    pub const NS = struct {
         /// A domain name which specifies a host which should be
         /// authoritative for the specified class and domain.
         nsdname: DomainName,
     };
 
-    const PTR = struct {
+    pub const PTR = struct {
         /// A domain name which points to some location in the domain name
         /// space.
         ptrdname: DomainName,
     };
 
-    const SOA = struct {
+    pub const SOA = struct {
         /// The domain name of the name server that was the original or
         /// primary source of data for this zone.
         mname: DomainName,
@@ -296,17 +298,17 @@ const ResourceData = union(enum) {
         minimum: u32,
     };
 
-    const TXT = struct {
+    pub const TXT = struct {
         /// One or more strings.
         txt_data: []const u8,
     };
 
-    const A = struct {
+    pub const A = struct {
         /// An internet address
         address: std.net.Ip4Address,
     };
 
-    const WKS = struct {
+    pub const WKS = struct {
         /// An internet address
         address: std.net.Ip4Address,
         /// An IP protocol number
