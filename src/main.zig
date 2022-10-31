@@ -158,8 +158,14 @@ const QClass = enum (u16) {
 /// number of octets; no padding is used.
 const DomainName = []Label;
 
+// TODO: Proper label compression
 const Label = struct {
-    length: u8,
+    options: enum(u2) {
+        not_compressed = 0,
+        compressed = 0b11,
+        _,
+    },
+    length: u6,
     string: []const u8,
 };
 
