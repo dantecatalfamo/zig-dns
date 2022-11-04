@@ -1,5 +1,9 @@
 const std = @import("std");
+const mem = std.mem;
+const testing = std.testing;
 const builtin = @import("builtin");
+
+const StrList = std.ArrayList([]const u8);
 
 pub fn main() anyerror!void {
     std.log.info("All your codebase are belong to us.", .{});
@@ -70,29 +74,29 @@ pub const Header = packed struct {
 
     pub fn parse(bytes: []const u8) Header {
         std.debug.assert(bytes.len == @sizeOf(Header));
-        var header = @ptrCast(*const Header, bytes).*;
+        var header = @ptrCast(*const Header, @alignCast(@alignOf(Header), bytes)).*;
         if (builtin.cpu.arch.endian() == .Big) {
             return header;
         }
-        header.id = @byteSwap(u16, header.id);
-        header.query_count = @byteSwap(u16, header.query_count);
-        header.answer_count = @byteSwap(u16, header.answer_count);
-        header.name_server_count = @byteSwap(u16, header.name_server_count);
-        header.additional_record_count = @byteSwap(u16, header.additional_record_count);
+        header.id = @byteSwap(header.id);
+        header.query_count = @byteSwap(header.query_count);
+        header.answer_count = @byteSwap(header.answer_count);
+        header.name_server_count = @byteSwap(header.name_server_count);
+        header.additional_record_count = @byteSwap(header.additional_record_count);
         return header;
     }
 
     pub fn to_bytes(self: *const Header) [@sizeOf(Header)]u8 {
         var header = self.*;
         if (builtin.cpu.arch.endian() == .Big) {
-            return @bitCast([@sizeOf(Header)]u8, header);
+            return std.mem.asBytes(self).*;
         }
-        header.id = @byteSwap(u16, header.id);
-        header.query_count = @byteSwap(u16, header.query_count);
-        header.answer_count = @byteSwap(u16, header.answer_count);
-        header.name_server_count = @byteSwap(u16, header.name_server_count);
-        header.additional_record_count = @byteSwap(u16, header.additional_record_count);
-        return @bitCast([@sizeOf(Header)]u8, header);
+        header.id = @byteSwap(header.id);
+        header.query_count = @byteSwap(header.query_count);
+        header.answer_count = @byteSwap(header.answer_count);
+        header.name_server_count = @byteSwap(header.name_server_count);
+        header.additional_record_count = @byteSwap(header.additional_record_count);
+        return std.mem.asBytes(&header).*;
     }
 };
 
@@ -112,7 +116,9 @@ test "Header.to_bytes reverses parse" {
     const pkt = @embedFile("query.bin");
     const header = Header.parse(pkt[0..@sizeOf(Header)]);
     const bytes = header.to_bytes();
-    try std.testing.expectEqualSlices(u8, pkt[0..@sizeOf(Header)], &bytes);
+    var orig = [_]u8{0} ** @sizeOf(Header);
+    mem.copy(u8, &orig, &bytes);
+    try std.testing.expectEqualSlices(u8, &orig, &bytes);
     const header2 = Header.parse(&bytes);
     try std.testing.expectEqual(header, header2);
 }
