@@ -101,7 +101,7 @@ pub const Header = packed struct {
 };
 
 test "Header.parse simple request" {
-    const pkt = @embedFile("query.bin");
+    const pkt = @embedFile("test/query.bin");
     const header = Header.parse(pkt[0..@sizeOf(Header)]);
     try std.testing.expectEqual(@as(u16, 23002), header.id);
     try std.testing.expectEqual(true, header.query);
@@ -113,7 +113,7 @@ test "Header.parse simple request" {
 }
 
 test "Header.to_bytes reverses parse" {
-    const pkt = @embedFile("query.bin");
+    const pkt = @embedFile("test/query.bin");
     const header = Header.parse(pkt[0..@sizeOf(Header)]);
     const bytes = header.to_bytes();
     var orig = [_]u8{0} ** @sizeOf(Header);
