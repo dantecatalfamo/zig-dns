@@ -1,12 +1,39 @@
 const std = @import("std");
 const mem = std.mem;
 const testing = std.testing;
+const network = @import("network");
 const builtin = @import("builtin");
 
 const StrList = std.ArrayList([]const u8);
 
 pub fn main() anyerror!void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    var allocator = gpa.allocator();
+    try network.init();
+    defer network.deinit();
     std.log.info("All your codebase are belong to us.", .{});
+    const sock = try network.connectToHost(allocator, "192.168.0.23", 53, .udp);
+    defer sock.close();
+    const writer = sock.writer();
+
+    var header = Header{
+        .id = 1,
+        .response = false,
+        .opcode = .query,
+        .authoritative_answer = false,
+        .truncation = false,
+        .recursion_desired = false,
+        .recursion_available = false,
+        .z = 0,
+        .response_code = .no_error,
+        .query_count = 0,
+        .answer_count = 0,
+        .name_server_count = 0,
+        .additional_record_count = 0,
+    };
+
+    try writer.writeAll(&header.to_bytes());
 }
 
 pub const Message = struct {
@@ -23,17 +50,39 @@ pub const Header = packed struct {
     /// and can be used by the requester to match up replies to
     /// outstanding queries.
     id: u16,
+
+    // Flags section. Fields are ordered this way because zig has
+    // little endian bit order for bit fields.
+
+    // Byte one
+
+    /// Directs the name server to pursue the query recursively.
+    /// Recursive query support is optional.
+    recursion_desired: bool,
+    /// If the message was truncated
+    truncation: bool,
+    /// The responding name server is an authority for the domain name
+    /// in question section.
+    authoritative_answer: bool,
+    /// Kind of query in this message. This value is set by the
+    /// originator of a query and copied into the response.
+    opcode: Opcode,
     /// Specifies whether this message is a query (false), or a
     /// response (true).
-    query: bool,
-    opcode: Opcode,
-    authoritative_answer: bool,
-    truncation: bool,
-    recursion_desired: bool,
-    recursion_available: bool,
-    /// Reserved
-    z: u3,
+    response: bool,
+
+    // Byte two
+
+    /// Set as part of responses.
     response_code: ResponseCode,
+    /// Reserved. Must be zero
+    z: u3,
+    /// Set or cleared in a response, and denotes whether recursive
+    /// query support is available in the name server.
+    recursion_available: bool,
+
+    // End of flag section.
+
     /// The number of entries in the question section.
     query_count: u16,
     /// The number of resource records in the answer section.

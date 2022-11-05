@@ -12,6 +12,7 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
 
     const exe = b.addExecutable("zig-dns", "src/main.zig");
+    exe.addPackagePath("network", "zig-network/network.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
