@@ -216,19 +216,62 @@ pub const QClass = enum (u16) {
 /// the null label of the root. Note that this field may be an odd
 /// number of octets; no padding is used.
 pub const DomainName = struct {
-    labels: []Label,
+    allocator: mem.Allocator,
+    labels: [][]const u8,
+
+    pub fn parse(allocator: mem.Allocator, bytes: []const u8) !DomainName {
+        var index: usize = 0;
+        var header = @bitCast(Label.Header, bytes[0]);
+        std.debug.print("byte zero: {b}, init header: {}\n", .{ bytes[0], header });
+        var str_list = StrList.init(allocator);
+        index += 1;
+        while (header.length != 0) {
+            std.debug.print("Label length: {d}\n", .{ header.length });
+            const string = try allocator.dupe(u8, bytes[index..index+header.length]);
+            std.debug.print("Parsed label {s}\n", .{ string });
+            try str_list.append(string);
+            index += string.len;
+            header = @bitCast(Label.Header, bytes[index]);
+        }
+        const empty = [0]u8{};
+        try str_list.append(&empty);
+
+        return DomainName{
+            .allocator = allocator,
+            .labels = str_list.toOwnedSlice(),
+        };
+    }
+
+    pub fn deinit(self: *DomainName) void {
+        for (self.labels) |label| {
+            self.allocator.free(label);
+        }
+        self.allocator.free(self.labels);
+    }
+
+    // TODO: Proper label compression
+    pub const Label = struct {
+        pub const Header = packed struct {
+            options: Options,
+            length: Length,
+        };
+
+        pub const Options = enum(u2) {
+            not_compressed = 0,
+            compressed = 0b11,
+            _,
+        };
+
+        pub const Length = u6;
+    };
 };
 
-// TODO: Proper label compression
-pub const Label = struct {
-    options: enum(u2) {
-        not_compressed = 0,
-        compressed = 0b11,
-        _,
-    },
-    length: u6,
-    string: []const u8,
-};
+test "DomainName.parse" {
+    const pkt = @embedFile("query.bin");
+    const domain = pkt[12..];
+    const parsed = try DomainName.parse(testing.allocator, domain);
+    std.debug.print("\n{}\n", .{ parsed });
+}
 
 pub const ResourceData = union(enum) {
     cname: CNAME,
