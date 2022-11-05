@@ -23,7 +23,7 @@ pub fn main() anyerror!void {
         .opcode = .query,
         .authoritative_answer = false,
         .truncation = false,
-        .recursion_desired = false,
+        .recursion_desired = true,
         .recursion_available = false,
         .z = 0,
         .response_code = .no_error,
