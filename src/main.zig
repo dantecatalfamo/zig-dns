@@ -76,7 +76,7 @@ pub const Header = packed struct {
     /// Set as part of responses.
     response_code: ResponseCode,
     /// Reserved. Must be zero
-    z: u3,
+    z: u3 = 0,
     /// Set or cleared in a response, and denotes whether recursive
     /// query support is available in the name server.
     recursion_available: bool,
