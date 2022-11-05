@@ -176,6 +176,23 @@ pub const Question = struct {
     qname: DomainName,
     qtype: QType,
     qclass: QClass,
+
+    /// Caller owns memory
+    pub fn to_bytes(self: *const Question, allocator: mem.Allocator) ![]const u8 {
+        const big_endian = builtin.cpu.arch.endian() == .big;
+
+        var bytes = std.ArrayList(u8).init(allocator);
+        const name_bytes = try self.qname.to_bytes(allocator);
+        defer allocator.free(name_bytes);
+        try bytes.appendSlice(name_bytes);
+
+        const qtype = if (big_endian) self.qtype else @byteSwap(self.qtype);
+        try bytes.appendSlice(mem.asBytes(&qtype));
+        const qclass = if (big_endian) self.qclass else @byteSwap(self.qclass);
+        try bytes.appendSlice(mem.asBytes(&qclass));
+
+        return bytes.toOwnedSlice();
+    }
 };
 
 pub const ResourceRecord = struct {
@@ -289,7 +306,7 @@ pub const DomainName = struct {
         };
     }
 
-    /// Returns bytes, owned by caller
+    /// Caller owns memory
     pub fn to_bytes(self: *const DomainName, allocator: mem.Allocator) ![]const u8 {
         var bytes = std.ArrayList(u8).init(allocator);
         for (self.labels) |label| {
@@ -305,6 +322,23 @@ pub const DomainName = struct {
             try bytes.appendSlice(label);
         }
         return bytes.toOwnedSlice();
+    }
+
+    pub fn from_string(allocator: mem.Allocator, name: []const u8) !DomainName {
+        var iter = mem.split(u8, name, ".");
+        var str_list = StrList.init(allocator);
+        while (iter.next()) |label| {
+            if (label.len == 0)
+                break;
+            const duped = try allocator.dupe(u8, label);
+            try str_list.append(duped);
+        }
+        const empty = try allocator.alloc(u8, 0);
+        try str_list.append(empty);
+        return DomainName{
+            .allocator = allocator,
+            .labels = str_list.toOwnedSlice(),
+        };
     }
 
     pub fn deinit(self: *const DomainName) void {
@@ -332,7 +366,7 @@ pub const DomainName = struct {
     };
 };
 
-test "DomainName.parse" {
+test "DomainName" {
     const pkt = @embedFile("test/query.bin");
     const domain = pkt[12..];
     const parsed = try DomainName.parse(testing.allocator, domain);
@@ -343,6 +377,11 @@ test "DomainName.parse" {
     const bytes = try parsed.to_bytes(testing.allocator);
     defer testing.allocator.free(bytes);
     try testing.expectEqualSlices(u8, domain[0..bytes.len], bytes);
+    const from_str = try DomainName.from_string(testing.allocator, "lambda.cx");
+    defer from_str.deinit();
+    const from_str_bytes = try from_str.to_bytes(testing.allocator);
+    defer testing.allocator.free(from_str_bytes);
+    try testing.expectEqualSlices(u8, bytes, from_str_bytes);
 }
 
 pub const ResourceData = union(enum) {
