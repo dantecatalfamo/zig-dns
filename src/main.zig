@@ -17,7 +17,7 @@ pub fn main() anyerror!void {
     defer sock.close();
     const writer = sock.writer();
 
-    var header = Header{
+    const header = Header{
         .id = 1,
         .response = false,
         .opcode = .query,
@@ -27,24 +27,59 @@ pub fn main() anyerror!void {
         .recursion_available = false,
         .z = 0,
         .response_code = .no_error,
-        .query_count = 0,
+        .question_count = 1,
         .answer_count = 0,
         .name_server_count = 0,
         .additional_record_count = 0,
     };
 
-    try writer.writeAll(&header.to_bytes());
+    const domain = try DomainName.from_string(allocator, "lambda.cx");
+    defer domain.deinit();
+    const question = Question{
+        .qname = domain,
+        .qtype = @intToEnum(QType, @enumToInt(Type.A)),
+        .qclass = @intToEnum(QClass, @enumToInt(Class.IN)),
+    };
+    const questions = [_]Question{ question };
+    const message = Message{
+        .header = header,
+        .question = &questions,
+        .answer = &.{},
+        .authority = &.{},
+        .additional = &.{}
+    };
+    const message_bytes = try message.to_bytes(allocator);
+    defer allocator.free(message_bytes);
+
+    std.debug.print("Sending bytes: {any}\n", .{ message_bytes });
+    try writer.writeAll(message_bytes);
 }
 
 pub const Message = struct {
     header: Header,
-    question: []Question,
-    answer: []ResourceRecord,
-    authority: []ResourceRecord,
-    Additional: []ResourceRecord,
+    question: []const Question,
+    answer: []const ResourceRecord,
+    authority: []const ResourceRecord,
+    additional: []const ResourceRecord,
+
+    // TODO Only question done so far
+    pub fn to_bytes(self: Message, allocator: mem.Allocator) ![]const u8 {
+        var bytes = std.ArrayList(u8).init(allocator);
+        const header_bytes = self.header.to_bytes();
+        std.debug.print("Header bytes: {any}\n", .{ header_bytes });
+        try bytes.appendSlice(&header_bytes);
+        for (self.question) |q| {
+            const q_bytes = try q.to_bytes(allocator);
+            std.debug.print("Q_Bytes Bytes: {any}\n", .{ q_bytes });
+            defer allocator.free(q_bytes);
+            try bytes.appendSlice(q_bytes);
+        }
+        std.debug.print("Message bytes: {any}\n", .{ bytes.items });
+        return bytes.toOwnedSlice();
+    }
 };
 
-pub const Header = packed struct {
+pub const Header = packed struct (u96) {
     /// An identifier assigned by the program that generates any kind
     /// of query. This identifier is copied the corresponding reply
     /// and can be used by the requester to match up replies to
@@ -84,7 +119,7 @@ pub const Header = packed struct {
     // End of flag section.
 
     /// The number of entries in the question section.
-    query_count: u16,
+    question_count: u16,
     /// The number of resource records in the answer section.
     answer_count: u16,
     /// The number of name server resource records in the authority
@@ -128,24 +163,24 @@ pub const Header = packed struct {
             return header;
         }
         header.id = @byteSwap(header.id);
-        header.query_count = @byteSwap(header.query_count);
+        header.question_count = @byteSwap(header.question_count);
         header.answer_count = @byteSwap(header.answer_count);
         header.name_server_count = @byteSwap(header.name_server_count);
         header.additional_record_count = @byteSwap(header.additional_record_count);
         return header;
     }
 
-    pub fn to_bytes(self: *const Header) [@sizeOf(Header)]u8 {
+    pub fn to_bytes(self: *const Header) [12]u8 {
         var header = self.*;
         if (builtin.cpu.arch.endian() == .Big) {
-            return std.mem.asBytes(self).*;
+            return @bitCast([12]u8, header);
         }
         header.id = @byteSwap(header.id);
-        header.query_count = @byteSwap(header.query_count);
+        header.question_count = @byteSwap(header.question_count);
         header.answer_count = @byteSwap(header.answer_count);
         header.name_server_count = @byteSwap(header.name_server_count);
         header.additional_record_count = @byteSwap(header.additional_record_count);
-        return std.mem.asBytes(&header).*;
+        return @bitCast([12]u8, header);
     }
 };
 
@@ -157,7 +192,7 @@ test "Header.parse simple request" {
     try std.testing.expectEqual(Header.Opcode.query, header.opcode);
     try std.testing.expectEqual(false, header.authoritative_answer);
     try std.testing.expectEqual(false, header.truncation);
-    try std.testing.expectEqual(@as(u16, 1), header.query_count);
+    try std.testing.expectEqual(@as(u16, 1), header.question_count);
     try std.testing.expectEqual(@as(u16, 0), header.name_server_count);
 }
 
@@ -179,18 +214,19 @@ pub const Question = struct {
 
     /// Caller owns memory
     pub fn to_bytes(self: *const Question, allocator: mem.Allocator) ![]const u8 {
-        const big_endian = builtin.cpu.arch.endian() == .big;
+        const big_endian = builtin.cpu.arch.endian() == .Big;
 
         var bytes = std.ArrayList(u8).init(allocator);
         const name_bytes = try self.qname.to_bytes(allocator);
         defer allocator.free(name_bytes);
         try bytes.appendSlice(name_bytes);
 
-        const qtype = if (big_endian) self.qtype else @byteSwap(self.qtype);
+        const qtype = if (big_endian) @enumToInt(self.qtype) else @byteSwap(@enumToInt(self.qtype));
         try bytes.appendSlice(mem.asBytes(&qtype));
-        const qclass = if (big_endian) self.qclass else @byteSwap(self.qclass);
+        const qclass = if (big_endian) @enumToInt(self.qclass) else @byteSwap(@enumToInt(self.qclass));
         try bytes.appendSlice(mem.asBytes(&qclass));
 
+        std.debug.print("Question bytes: {any}\n", .{bytes.items});
         return bytes.toOwnedSlice();
     }
 };
@@ -266,14 +302,14 @@ pub const Class = enum (u16) {
     CH = 3,
     /// Hesiod [Dyer 87]
     HS = 4,
-
-    _,
 };
 
 /// QCLASS values are a superset of CLASS values; every CLASS is a valid QCLASS.
 pub const QClass = enum (u16) {
     /// Any Class
     @"*" = 255,
+
+    _,
 };
 
 /// A domain name represented as a sequence of labels, where each
