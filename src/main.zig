@@ -289,6 +289,24 @@ pub const DomainName = struct {
         };
     }
 
+    /// Returns bytes, owned by caller
+    pub fn to_bytes(self: *const DomainName, allocator: mem.Allocator) ![]const u8 {
+        var bytes = std.ArrayList(u8).init(allocator);
+        for (self.labels) |label| {
+            if (label.len > std.math.maxInt(Label.Length)) {
+                return error.LabelTooLong;
+            }
+            const header = Label.Header{
+                .length = @intCast(u6, label.len),
+                .options = .not_compressed,
+            };
+            const byte = @bitCast(u8, header);
+            try bytes.append(byte);
+            try bytes.appendSlice(label);
+        }
+        return bytes.toOwnedSlice();
+    }
+
     pub fn deinit(self: *const DomainName) void {
         for (self.labels) |label| {
             self.allocator.free(label);
@@ -319,6 +337,12 @@ test "DomainName.parse" {
     const domain = pkt[12..];
     const parsed = try DomainName.parse(testing.allocator, domain);
     defer parsed.deinit();
+    try testing.expectEqualStrings("lambda", parsed.labels[0]);
+    try testing.expectEqualStrings("cx", parsed.labels[1]);
+    try testing.expectEqualStrings("", parsed.labels[2]);
+    const bytes = try parsed.to_bytes(testing.allocator);
+    defer testing.allocator.free(bytes);
+    try testing.expectEqualSlices(u8, domain[0..bytes.len], bytes);
 }
 
 pub const ResourceData = union(enum) {
