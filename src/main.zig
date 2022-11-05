@@ -153,7 +153,7 @@ test "Header.parse simple request" {
     const pkt = @embedFile("test/query.bin");
     const header = Header.parse(pkt[0..@sizeOf(Header)]);
     try std.testing.expectEqual(@as(u16, 23002), header.id);
-    try std.testing.expectEqual(true, header.query);
+    try std.testing.expectEqual(false, header.response);
     try std.testing.expectEqual(Header.Opcode.query, header.opcode);
     try std.testing.expectEqual(false, header.authoritative_answer);
     try std.testing.expectEqual(false, header.truncation);
@@ -271,19 +271,17 @@ pub const DomainName = struct {
     pub fn parse(allocator: mem.Allocator, bytes: []const u8) !DomainName {
         var index: usize = 0;
         var header = @bitCast(Label.Header, bytes[0]);
-        std.debug.print("byte zero: {b}, init header: {}\n", .{ bytes[0], header });
         var str_list = StrList.init(allocator);
         index += 1;
         while (header.length != 0) {
-            std.debug.print("Label length: {d}\n", .{ header.length });
             const string = try allocator.dupe(u8, bytes[index..index+header.length]);
-            std.debug.print("Parsed label {s}\n", .{ string });
             try str_list.append(string);
             index += string.len;
             header = @bitCast(Label.Header, bytes[index]);
+            index += 1;
         }
-        const empty = [0]u8{};
-        try str_list.append(&empty);
+        const empty = try allocator.alloc(u8, 0);
+        try str_list.append(empty);
 
         return DomainName{
             .allocator = allocator,
@@ -291,7 +289,7 @@ pub const DomainName = struct {
         };
     }
 
-    pub fn deinit(self: *DomainName) void {
+    pub fn deinit(self: *const DomainName) void {
         for (self.labels) |label| {
             self.allocator.free(label);
         }
@@ -300,9 +298,10 @@ pub const DomainName = struct {
 
     // TODO: Proper label compression
     pub const Label = struct {
+        // Little bit endian packed struct
         pub const Header = packed struct {
-            options: Options,
             length: Length,
+            options: Options,
         };
 
         pub const Options = enum(u2) {
@@ -316,10 +315,10 @@ pub const DomainName = struct {
 };
 
 test "DomainName.parse" {
-    const pkt = @embedFile("query.bin");
+    const pkt = @embedFile("test/query.bin");
     const domain = pkt[12..];
     const parsed = try DomainName.parse(testing.allocator, domain);
-    std.debug.print("\n{}\n", .{ parsed });
+    defer parsed.deinit();
 }
 
 pub const ResourceData = union(enum) {
