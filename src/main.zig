@@ -471,10 +471,20 @@ pub const ResourceData = union(enum) {
     a: A,
     wks: WKS,
 
+    pub fn to_writer(self: *const ResourceData, writer: network.Socket.Writer) !void {
+        switch (self) {
+            inline else => |record| try record.to_writer(writer),
+        }
+    }
+
     pub const CNAME = struct {
         /// A domain name which specifies the canonical or primary name
         /// for the owner. The owner name is an alias.
         cname: DomainName,
+
+        pub fn to_writer(self: *const CNAME, writer: anytype) !void {
+            try self.cname.to_writer(writer);
+        }
     };
 
     pub const HINFO = struct {
@@ -482,12 +492,23 @@ pub const ResourceData = union(enum) {
         cpu: []const u8,
         /// A string which specifies the operating system type.
         os:  []const u8,
+
+        pub fn to_writer(self: *const HINFO, writer: anytype) !void {
+            try writer.writeAll(self.cpu);
+            try writer.writeByte(0);
+            try writer.writeAll(self.os);
+            try writer.writeByte(0);
+        }
     };
 
     pub const MB = struct {
         /// A domain name which specifies a host which has the specified
         /// mailbox.
         madname: DomainName,
+
+        pub fn to_writer(self: *const MB, writer: anytype) !void {
+            try self.madname.to_writer(writer);
+        }
     };
 
     pub const MD = struct {
@@ -495,6 +516,10 @@ pub const ResourceData = union(enum) {
         /// for the domain which should be able to deliver mail for the
         /// domain.
         madname: DomainName,
+
+        pub fn to_writer(self: *const MD, writer: anytype) !void {
+            try self.madname.to_writer(writer);
+        }
     };
 
     pub const MF = struct {
@@ -502,12 +527,20 @@ pub const ResourceData = union(enum) {
         /// for the domain which will accept mail for forwarding to the
         /// domain.
         madname: DomainName,
+
+        pub fn to_writer(self: *const MD, writer: anytype) !void {
+            try self.madname.to_writer(writer);
+        }
     };
 
     pub const MG = struct {
         /// A domain name which specifies a mailbox which is a member of
         /// the mail group specified by the domain name.
         madname: DomainName,
+
+        pub fn to_writer(self: *const MG, writer: anytype) !void {
+            try self.madname.to_writer(writer);
+        }
     };
 
     pub const MINFO = struct {
@@ -525,12 +558,21 @@ pub const ResourceData = union(enum) {
         /// names the root, errors should be returned to the sender of the
         /// message.
         emailbx: DomainName,
+
+        pub fn to_writer(self: *const MINFO, writer: anytype) !void {
+            try self.rmailbx.to_writer(writer);
+            try self.emailbx.to_writer(writer);
+        }
     };
 
     pub const MR = struct {
         /// A domain name which specifies a mailbox which is the proper
         /// rename of the specified mailbox.
         madname: DomainName,
+
+        pub fn to_writer(self: *const MR, writer: anytype) !void {
+            try self.madname.to_writer(writer);
+        }
     };
 
     pub const MX = struct {
@@ -540,20 +582,39 @@ pub const ResourceData = union(enum) {
         /// A domain name which specifies a host willing to act as a
         /// mail exchange for the owner name.
         exchange: DomainName,
+
+        pub fn to_writer(self: *const MX, writer: anytype) !void {
+            try writer.writeIntBig(u16, self.preference);
+            try self.exchange.to_writer(writer);
+        }
     };
 
-    pub const NULL = []const u8;
+    pub const NULL = struct {
+        data: []const u8,
+
+        pub fn to_writer(self: *const NULL, writer: anytype) !void {
+            try writer.writeAll(self.data);
+        }
+    };
 
     pub const NS = struct {
         /// A domain name which specifies a host which should be
         /// authoritative for the specified class and domain.
         nsdname: DomainName,
+
+        pub fn to_writer(self: *const NS, writer: anytype) !void {
+            try self.nsdname.to_writer(writer);
+        }
     };
 
     pub const PTR = struct {
         /// A domain name which points to some location in the domain name
         /// space.
         ptrdname: DomainName,
+
+        pub fn to_writer(self: *const PTR, writer: anytype) !void {
+            try self.ptrdname.to_writer(writer);
+        }
     };
 
     pub const SOA = struct {
@@ -578,24 +639,51 @@ pub const ResourceData = union(enum) {
         /// The minimum TTL field that should be exported with any RR from
         /// this zone.
         minimum: u32,
+
+        pub fn to_writer(self: *const SOA, writer: network.Socket.Writer) !void {
+            try self.mname.to_writer(writer);
+            try self.rname.to_writer(writer);
+            try writer.writeIntBig(u32, self.serial);
+            try writer.writeIntBig(i32, self.refresh);
+            try writer.writeIntBig(i32, self.retry);
+            try writer.writeIntBig(i32, self.expire);
+            try writer.writeIntBig(u32, self.minimum);
+        }
     };
 
     pub const TXT = struct {
         /// One or more strings.
         txt_data: []const u8,
+
+        pub fn to_writer(self: *const TXT, writer: anytype) !void {
+            try writer.writeAll(self.txt_data);
+            try writer.writeByte(0);
+        }
     };
 
     pub const A = struct {
         /// An internet address
-        address: std.net.Ip4Address,
+        address: [4]u8,
+
+        pub fn to_writer(self: *const A, writer: anytype) !void {
+            // XXX This may be incorrect endianness
+            try writer.writeAll(self.address);
+            // try writer.writeIntBig(u32, self.address.sa.addr);
+        }
     };
 
     pub const WKS = struct {
         /// An internet address
-        address: std.net.Ip4Address,
+        address: [4]u8,
         /// An IP protocol number
         protocol: u8,
         /// A variable length bit map.
         bit_map: []const u8,
+
+        pub fn to_writer(self: *const WKS, writer: network.Socket.Writer) !void {
+            try writer.writeAll(self.address);
+            try writer.writeByte(self.protocol);
+            try writer.writeAll(self.bit_map);
+        }
     };
 };
