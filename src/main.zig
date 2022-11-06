@@ -192,20 +192,6 @@ pub const Header = packed struct (u96) {
         _,
     };
 
-    pub fn parse(bytes: []const u8) Header {
-        std.debug.assert(bytes.len == @sizeOf(Header));
-        var header = @ptrCast(*const Header, @alignCast(@alignOf(Header), bytes)).*;
-        if (builtin.cpu.arch.endian() == .Big) {
-            return header;
-        }
-        header.id = @byteSwap(header.id);
-        header.question_count = @byteSwap(header.question_count);
-        header.answer_count = @byteSwap(header.answer_count);
-        header.name_server_count = @byteSwap(header.name_server_count);
-        header.additional_record_count = @byteSwap(header.additional_record_count);
-        return header;
-    }
-
     pub fn from_reader(reader: anytype) !Header {
         var bytes = [_]u8{0} ** 12;
         const bytes_read = try reader.readAll(&bytes);
@@ -390,27 +376,6 @@ pub const QClass = enum (u16) {
 pub const DomainName = struct {
     allocator: mem.Allocator,
     labels: [][]const u8,
-
-    pub fn parse(allocator: mem.Allocator, bytes: []const u8) !DomainName {
-        var index: usize = 0;
-        var header = @bitCast(Label.Header, bytes[0]);
-        var str_list = StrList.init(allocator);
-        index += 1;
-        while (header.length != 0) {
-            const string = try allocator.dupe(u8, bytes[index..index+header.length]);
-            try str_list.append(string);
-            index += string.len;
-            header = @bitCast(Label.Header, bytes[index]);
-            index += 1;
-        }
-        const empty = try allocator.alloc(u8, 0);
-        try str_list.append(empty);
-
-        return DomainName{
-            .allocator = allocator,
-            .labels = str_list.toOwnedSlice(),
-        };
-    }
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !DomainName {
         var header = @bitCast(Label.Header, try reader.readByte());
