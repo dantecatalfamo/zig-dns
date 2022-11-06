@@ -5,6 +5,7 @@ const network = @import("network");
 const builtin = @import("builtin");
 
 const StrList = std.ArrayList([]const u8);
+const QuestionList = std.ArrayList(Question);
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -42,10 +43,11 @@ pub fn main() anyerror!void {
     };
     const questions = [_]Question{ question };
     const message = Message{
+        .allocator = allocator,
         .header = header,
-        .question = &questions,
-        .answer = &.{},
-        .authority = &.{},
+        .questions = &questions,
+        .answers = &.{},
+        .authorities = &.{},
         .additional = &.{}
     };
     const message_bytes = try message.to_bytes(allocator);
@@ -53,13 +55,21 @@ pub fn main() anyerror!void {
 
     std.debug.print("Sending bytes: {any}\n", .{ message_bytes });
     try writer.writeAll(message_bytes);
+    var recv = [_]u8{0} ** 1024;
+    const recv_size = try sock.receive(&recv);
+    std.debug.print("Recv: {any}\n", .{ recv[0..recv_size] });
+    var recv_buffer = std.io.fixedBufferStream(recv[0..recv_size]);
+    const response = try Message.from_reader(allocator, recv_buffer.reader());
+    defer response.deinit();
+    std.debug.print("{any}\n", .{ response });
 }
 
 pub const Message = struct {
+    allocator: mem.Allocator,
     header: Header,
-    question: []const Question,
-    answer: []const ResourceRecord,
-    authority: []const ResourceRecord,
+    questions: []const Question,
+    answers: []const ResourceRecord,
+    authorities: []const ResourceRecord,
     additional: []const ResourceRecord,
 
     // TODO Only question done so far
@@ -68,7 +78,7 @@ pub const Message = struct {
         const header_bytes = self.header.to_bytes();
         std.debug.print("Header bytes: {any}\n", .{ header_bytes });
         try bytes.appendSlice(&header_bytes);
-        for (self.question) |q| {
+        for (self.questions) |q| {
             const q_bytes = try q.to_bytes(allocator);
             std.debug.print("Q_Bytes Bytes: {any}\n", .{ q_bytes });
             defer allocator.free(q_bytes);
@@ -76,6 +86,32 @@ pub const Message = struct {
         }
         std.debug.print("Message bytes: {any}\n", .{ bytes.items });
         return bytes.toOwnedSlice();
+    }
+
+    pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Message {
+        var questions = QuestionList.init(allocator);
+        var header = try Header.from_reader(reader);
+        var qidx: usize = 0;
+        while (qidx < header.question_count) : (qidx += 1) {
+            const question = try Question.from_reader(allocator, reader);
+            try questions.append(question);
+        }
+
+        return Message{
+            .allocator = allocator,
+            .header = header,
+            .questions = questions.toOwnedSlice(),
+            .answers = &.{},
+            .authorities = &.{},
+            .additional = &.{},
+        };
+    }
+
+    pub fn deinit(self: *const Message) void {
+        for (self.questions) |question| {
+            question.deinit();
+        }
+        self.allocator.free(self.questions);
     }
 };
 
@@ -170,6 +206,24 @@ pub const Header = packed struct (u96) {
         return header;
     }
 
+    pub fn from_reader(reader: anytype) !Header {
+        var bytes = [_]u8{0} ** 12;
+        const bytes_read = try reader.readAll(&bytes);
+        if (bytes_read < 12) {
+            return error.NotEnoughBytes;
+        }
+        var header = @bitCast(Header, bytes);
+        if (builtin.cpu.arch.endian() == .Big) {
+            return header;
+        }
+        header.id = @byteSwap(header.id);
+        header.question_count = @byteSwap(header.question_count);
+        header.answer_count = @byteSwap(header.answer_count);
+        header.name_server_count = @byteSwap(header.name_server_count);
+        header.additional_record_count = @byteSwap(header.additional_record_count);
+        return header;
+    }
+
     pub fn to_bytes(self: *const Header) [12]u8 {
         var header = self.*;
         if (builtin.cpu.arch.endian() == .Big) {
@@ -228,6 +282,22 @@ pub const Question = struct {
 
         std.debug.print("Question bytes: {any}\n", .{bytes.items});
         return bytes.toOwnedSlice();
+    }
+
+    pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Question {
+        const qname = try DomainName.from_reader(allocator, reader);
+        var qtype = try reader.readIntBig(u16);
+        var qclass = try reader.readIntBig(u16);
+
+        return  Question{
+            .qname = qname,
+            .qtype = @intToEnum(QType, qtype),
+            .qclass = @intToEnum(QClass, qclass),
+        };
+    }
+
+    pub fn deinit(self: *const Question) void {
+        self.qname.deinit();
     }
 };
 
@@ -339,6 +409,27 @@ pub const DomainName = struct {
         return DomainName{
             .allocator = allocator,
             .labels = str_list.toOwnedSlice(),
+        };
+    }
+
+    pub fn from_reader(allocator: mem.Allocator, reader: anytype) !DomainName {
+        var header = @bitCast(Label.Header, try reader.readByte());
+        var labels = StrList.init(allocator);
+        while (header.length != 0) {
+            var string = try allocator.alloc(u8, header.length);
+            const string_length = try reader.readAll(string);
+            if (string_length < header.length) {
+                return error.NotEnoughBytes;
+            }
+            try labels.append(string);
+            header = @bitCast(Label.Header, try reader.readByte());
+        }
+        const empty = try allocator.alloc(u8, 0);
+        try labels.append(empty);
+
+        return DomainName{
+            .allocator = allocator,
+            .labels = labels.toOwnedSlice(),
         };
     }
 
