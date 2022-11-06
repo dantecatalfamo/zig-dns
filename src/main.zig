@@ -50,11 +50,12 @@ pub fn main() anyerror!void {
         .authorities = &.{},
         .additional = &.{}
     };
-    const message_bytes = try message.to_bytes(allocator);
-    defer allocator.free(message_bytes);
+    var message_bytes = std.ArrayList(u8).init(allocator);
+    defer message_bytes.deinit();
+    try message.to_writer(message_bytes.writer());
 
-    std.debug.print("Sending bytes: {any}\n", .{ message_bytes });
-    try writer.writeAll(message_bytes);
+    std.debug.print("Sending bytes: {any}\n", .{ message_bytes.items });
+    try writer.writeAll(message_bytes.items);
     var recv = [_]u8{0} ** 1024;
     const recv_size = try sock.receive(&recv);
     std.debug.print("Recv: {any}\n", .{ recv[0..recv_size] });
@@ -72,20 +73,11 @@ pub const Message = struct {
     authorities: []const ResourceRecord,
     additional: []const ResourceRecord,
 
-    // TODO Only question done so far
-    pub fn to_bytes(self: Message, allocator: mem.Allocator) ![]const u8 {
-        var bytes = std.ArrayList(u8).init(allocator);
-        const header_bytes = self.header.to_bytes();
-        std.debug.print("Header bytes: {any}\n", .{ header_bytes });
-        try bytes.appendSlice(&header_bytes);
-        for (self.questions) |q| {
-            const q_bytes = try q.to_bytes(allocator);
-            std.debug.print("Q_Bytes Bytes: {any}\n", .{ q_bytes });
-            defer allocator.free(q_bytes);
-            try bytes.appendSlice(q_bytes);
+    pub fn to_writer(self: *const Message, writer: anytype) !void {
+        try writer.writeAll(&self.header.to_bytes());
+        for (self.questions) |question| {
+            try question.to_writer(writer);
         }
-        std.debug.print("Message bytes: {any}\n", .{ bytes.items });
-        return bytes.toOwnedSlice();
     }
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Message {
@@ -252,22 +244,10 @@ pub const Question = struct {
     qtype: QType,
     qclass: QClass,
 
-    /// Caller owns memory
-    pub fn to_bytes(self: *const Question, allocator: mem.Allocator) ![]const u8 {
-        const big_endian = builtin.cpu.arch.endian() == .Big;
-
-        var bytes = std.ArrayList(u8).init(allocator);
-        const name_bytes = try self.qname.to_bytes(allocator);
-        defer allocator.free(name_bytes);
-        try bytes.appendSlice(name_bytes);
-
-        const qtype = if (big_endian) @enumToInt(self.qtype) else @byteSwap(@enumToInt(self.qtype));
-        try bytes.appendSlice(mem.asBytes(&qtype));
-        const qclass = if (big_endian) @enumToInt(self.qclass) else @byteSwap(@enumToInt(self.qclass));
-        try bytes.appendSlice(mem.asBytes(&qclass));
-
-        std.debug.print("Question bytes: {any}\n", .{bytes.items});
-        return bytes.toOwnedSlice();
+    pub fn to_writer(self: *const Question, writer: anytype) !void {
+        try self.qname.to_writer(writer);
+        try writer.writeIntBig(u16, @enumToInt(self.qtype));
+        try writer.writeIntBig(u16, @enumToInt(self.qclass));
     }
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Question {
@@ -398,9 +378,7 @@ pub const DomainName = struct {
         };
     }
 
-    /// Caller owns memory
-    pub fn to_bytes(self: *const DomainName, allocator: mem.Allocator) ![]const u8 {
-        var bytes = std.ArrayList(u8).init(allocator);
+    pub fn to_writer(self: *const DomainName, writer: anytype) !void {
         for (self.labels) |label| {
             if (label.len > std.math.maxInt(Label.Length)) {
                 return error.LabelTooLong;
@@ -410,10 +388,9 @@ pub const DomainName = struct {
                 .options = .not_compressed,
             };
             const byte = @bitCast(u8, header);
-            try bytes.append(byte);
-            try bytes.appendSlice(label);
+            try writer.writeByte(byte);
+            try writer.writeAll(label);
         }
-        return bytes.toOwnedSlice();
     }
 
     pub fn from_string(allocator: mem.Allocator, name: []const u8) !DomainName {
