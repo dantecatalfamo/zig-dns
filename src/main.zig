@@ -1,5 +1,6 @@
 const std = @import("std");
 const mem = std.mem;
+const io = std.io;
 const testing = std.testing;
 const network = @import("network");
 const builtin = @import("builtin");
@@ -77,6 +78,15 @@ pub const Message = struct {
         try writer.writeAll(&self.header.to_bytes());
         for (self.questions) |question| {
             try question.to_writer(writer);
+        }
+        for (self.answers) |answer| {
+            try answer.to_writer(writer);
+        }
+        for (self.authorities) |authority| {
+            try authority.to_writer(writer);
+        }
+        for (self.additional) |addition| {
+            addition.to_writer(writer);
         }
     }
 
@@ -274,6 +284,20 @@ pub const ResourceRecord = struct {
     ttl: i32,
     resource_data_length: u16,
     resource_data: ResourceData,
+
+    pub fn to_writer(self: *const ResourceRecord, writer: network.Socket.Writer) !void {
+        var resource_data = [_]u8{0} ** std.math.maxInt(u16);
+        var resource_data_stream = std.io.fixedBufferStream(resource_data);
+
+        try self.resource_data.to_writer(resource_data_stream.writer());
+
+        try self.name.to_writer(writer);
+        try writer.writeIntBig(u16, self.@"type");
+        try writer.writeIntBig(u16, self.class);
+        try writer.writeIntBig(i32, self.ttl);
+        try writer.writeIntBig(u16, try resource_data_stream.getPos());
+        try writer.writeAll(resource_data_stream.getWritten());
+    }
 };
 
 /// DNS Resource Record types
@@ -687,3 +711,7 @@ pub const ResourceData = union(enum) {
         }
     };
 };
+
+test "ref all decls" {
+    std.testing.refAllDeclsRecursive(@This());
+}
