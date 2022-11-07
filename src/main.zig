@@ -6,6 +6,7 @@ const network = @import("network");
 const builtin = @import("builtin");
 
 const StrList = std.ArrayList([]const u8);
+const LabelList = std.ArrayList(DomainName.Label);
 const QuestionList = std.ArrayList(Question);
 const ResourceRecordList = std.ArrayList(ResourceRecord);
 
@@ -444,21 +445,49 @@ pub const QClass = enum (u16) {
 /// number of octets; no padding is used.
 pub const DomainName = struct {
     allocator: mem.Allocator,
-    labels: [][]const u8,
+    labels: []Label,
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !DomainName {
-        var header = @bitCast(Label.Header, try reader.readByte());
-        var labels = StrList.init(allocator);
-        while (header.length != 0) {
-            var string = try allocator.alloc(u8, header.length);
-            const string_length = try reader.readAll(string);
-            if (string_length < header.length) {
-                return error.NotEnoughBytes;
+        var labels = LabelList.init(allocator);
+        var header_byte = try reader.readByte();
+        while (true) {
+            switch (@intToEnum(Label.Options, header_byte >> 6)) {
+                .text => {
+                    const header = @bitCast(Label.TextHeader, header_byte);
+                    if (header.length == 0) {
+                        break;
+                    }
+                    var string = try allocator.alloc(u8, header.length);
+                    const string_length = try reader.readAll(string);
+                    if (string_length < header.length) {
+                        return error.EndOfStream;
+                    }
+                    const label = Label{
+                        .text = string,
+                    };
+                    try labels.append(label);
+                },
+                .compressed => {
+                    const header = @bitCast(Label.TextHeader, header_byte);
+                    const pointer_end = try reader.readByte();
+                    // XXX Probably wrong
+                    const components = Label.PointerComponents{ .upper = header.length, .lower = pointer_end };
+                    const pointer = @bitCast(Label.Pointer, components);
+                    const label = Label{
+                        .compressed = pointer,
+                    };
+                    try labels.append(label);
+                    break;
+                },
+                else => {
+                    return error.UnsupportedLabel;
+                },
             }
-            try labels.append(string);
-            header = @bitCast(Label.Header, try reader.readByte());
         }
-        const empty = try allocator.alloc(u8, 0);
+
+        const empty = Label{
+            .text = try allocator.alloc(u8, 0),
+        };
         try labels.append(empty);
 
         return DomainName{
@@ -469,58 +498,90 @@ pub const DomainName = struct {
 
     pub fn to_writer(self: *const DomainName, writer: anytype) !void {
         for (self.labels) |label| {
-            if (label.len > std.math.maxInt(Label.Length)) {
-                return error.LabelTooLong;
+            switch (label) {
+                .text => |text| {
+                    if (text.len > std.math.maxInt(Label.Length)) {
+                        return error.LabelTooLong;
+                    }
+                    const header = Label.TextHeader{
+                        .length = @intCast(u6, text.len),
+                        .options = .text
+                    };
+                    const header_byte = @bitCast(u8, header);
+                    try writer.writeByte(header_byte);
+                    try writer.writeAll(text);
+                },
+                .compressed => |pointer| {
+                    const pointer_components = @bitCast(Label.PointerComponents, pointer);
+                    const header = Label.TextHeader{
+                        .length = pointer_components.upper,
+                        .options = .compressed,
+                    };
+                    const header_byte = @bitCast(u8, header);
+                    try writer.writeByte(header_byte);
+                    try writer.writeByte(pointer_components.lower);
+                },
+                // else => return error.UnsupportedLabel,
             }
-            const header = Label.Header{
-                .length = @intCast(u6, label.len),
-                .options = .not_compressed,
-            };
-            const byte = @bitCast(u8, header);
-            try writer.writeByte(byte);
-            try writer.writeAll(label);
         }
     }
 
     pub fn from_string(allocator: mem.Allocator, name: []const u8) !DomainName {
         var iter = mem.split(u8, name, ".");
-        var str_list = StrList.init(allocator);
-        while (iter.next()) |label| {
-            if (label.len == 0)
+        var labels = LabelList.init(allocator);
+        while (iter.next()) |text| {
+            if (text.len == 0)
                 break;
-            const duped = try allocator.dupe(u8, label);
-            try str_list.append(duped);
+            const duped = try allocator.dupe(u8, text);
+            const label = Label{
+                .text = duped,
+            };
+            try labels.append(label);
         }
         const empty = try allocator.alloc(u8, 0);
-        try str_list.append(empty);
+        const label = Label{
+            .text = empty,
+        };
+        try labels.append(label);
         return DomainName{
             .allocator = allocator,
-            .labels = str_list.toOwnedSlice(),
+            .labels = labels.toOwnedSlice(),
         };
     }
 
     pub fn deinit(self: *const DomainName) void {
         for (self.labels) |label| {
-            self.allocator.free(label);
+            switch (label) {
+                .text => |text| self.allocator.free(text),
+                else => {},
+            }
         }
         self.allocator.free(self.labels);
     }
 
     // TODO: Proper label compression
-    pub const Label = struct {
-        // Little bit endian packed struct
-        pub const Header = packed struct {
-            length: Length,
-            options: Options,
+    pub const Label = union(enum) {
+        text: []const u8,
+        compressed: Pointer,
+            // Little bit endian packed struct
+            pub const TextHeader = packed struct {
+                length: Length,
+                options: Options,
         };
 
         pub const Options = enum(u2) {
-            not_compressed = 0,
+            text = 0,
             compressed = 0b11,
             _,
         };
 
+        pub const PointerComponents = packed struct {
+            upper: u6,
+            lower: u8,
+        };
+
         pub const Length = u6;
+        pub const Pointer = u14;
     };
 };
 
