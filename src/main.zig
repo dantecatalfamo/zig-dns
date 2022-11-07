@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 
 const StrList = std.ArrayList([]const u8);
 const QuestionList = std.ArrayList(Question);
+const ResourceRecordList = std.ArrayList(ResourceRecord);
 
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -91,21 +92,43 @@ pub const Message = struct {
     }
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Message {
-        var questions = QuestionList.init(allocator);
         var header = try Header.from_reader(reader);
-        var qidx: usize = 0;
-        while (qidx < header.question_count) : (qidx += 1) {
+
+        var questions = QuestionList.init(allocator);
+        var q_idx: usize = 0;
+        while (q_idx < header.question_count) : (q_idx += 1) {
             const question = try Question.from_reader(allocator, reader);
             try questions.append(question);
+        }
+
+        var answers = ResourceRecordList.init(allocator);
+        var ans_idx: usize = 0;
+        while (ans_idx < header.answer_count) : (ans_idx += 1) {
+            const answer = try ResourceRecord.from_reader(allocator, reader);
+            try answers.append(answer);
+        }
+
+        var authorities = ResourceRecordList.init(allocator);
+        var auth_idx: usize = 0;
+        while (auth_idx < header.name_server_count) : (auth_idx += 1) {
+            const authority = try ResourceRecord.from_reader(allocator, reader);
+            try authorities.append(authority);
+        }
+
+        var additional = ResourceRecordList.init(allocator);
+        var add_idx: usize = 0;
+        while (add_idx < header.additional_record_count) : (add_idx += 1) {
+            const addit = try ResourceRecord.from_reader(allocator, reader);
+            try additional.append(addit);
         }
 
         return Message{
             .allocator = allocator,
             .header = header,
             .questions = questions.toOwnedSlice(),
-            .answers = &.{},
-            .authorities = &.{},
-            .additional = &.{},
+            .answers = answers.toOwnedSlice(),
+            .authorities = authorities.toOwnedSlice(),
+            .additional = additional.toOwnedSlice(),
         };
     }
 
@@ -114,6 +137,18 @@ pub const Message = struct {
             question.deinit();
         }
         self.allocator.free(self.questions);
+        for (self.answers) |answer| {
+            answer.deinit();
+        }
+        self.allocator.free(self.answers);
+        for (self.authorities) |authority| {
+            authority.deinit();
+        }
+        self.allocator.free(self.authorities);
+        for (self.additional) |addit| {
+            addit.deinit();
+        }
+        self.allocator.free(self.additional);
     }
 };
 
@@ -224,6 +259,11 @@ pub const Header = packed struct (u96) {
         header.additional_record_count = @byteSwap(header.additional_record_count);
         return @bitCast([12]u8, header);
     }
+
+    pub fn to_writer(self: *const Header, writer: anytype) !void {
+        const header = self.to_bytes();
+        try writer.writeAll(header);
+    }
 };
 
 test "Header.parse simple request" {
@@ -299,6 +339,29 @@ pub const ResourceRecord = struct {
         try writer.writeIntBig(i32, self.ttl);
         try writer.writeIntBig(u16, @intCast(u16, try resource_data_stream.getPos()));
         try writer.writeAll(resource_data_stream.getWritten());
+    }
+
+    pub fn from_reader(allocator: mem.Allocator, reader: anytype) !ResourceRecord {
+        const name = try DomainName.from_reader(allocator, reader);
+        const resource_type = @intToEnum(Type, try reader.readIntBig(u16));
+        const class = @intToEnum(Class, try reader.readIntBig(u16));
+        const ttl = try reader.readIntBig(i32);
+        const resource_data_length = try reader.readIntBig(u16);
+        const resource_data = try ResourceData.from_reader(allocator, reader, resource_type, resource_data_length);
+
+        return .{
+            .name = name,
+            .@"type" = resource_type,
+            .class = class,
+            .ttl = ttl,
+            .resource_data_length = resource_data_length,
+            .resource_data = resource_data,
+        };
+    }
+
+    pub fn deinit(self: *const ResourceRecord) void {
+        self.name.deinit();
+        self.resource_data.deinit();
     }
 };
 
@@ -504,6 +567,34 @@ pub const ResourceData = union(enum) {
         }
     }
 
+    pub fn from_reader(allocator: mem.Allocator, reader: anytype, resource_type: Type, size: u16) !ResourceData {
+        return switch (resource_type) {
+            .CNAME => ResourceData{ .cname   = try CNAME.from_reader(allocator, reader, size) },
+            .HINFO => ResourceData{ .hinfo   = try HINFO.from_reader(allocator, reader, size) },
+            .MB    => ResourceData{ .mb      = try    MB.from_reader(allocator, reader, size) },
+            .MD    => ResourceData{ .md      = try    MD.from_reader(allocator, reader, size) },
+            .MF    => ResourceData{ .mf      = try    MF.from_reader(allocator, reader, size) },
+            .MG    => ResourceData{ .mg      = try    MG.from_reader(allocator, reader, size) },
+            .MINFO => ResourceData{ .minfo   = try MINFO.from_reader(allocator, reader, size) },
+            .MR    => ResourceData{ .mr      = try    MR.from_reader(allocator, reader, size) },
+            .MX    => ResourceData{ .mx      = try    MX.from_reader(allocator, reader, size) },
+            .NULL  => ResourceData{ .@"null" = try  NULL.from_reader(allocator, reader, size) },
+            .NS    => ResourceData{ .ns      = try    NS.from_reader(allocator, reader, size) },
+            .PTR   => ResourceData{ .ptr     = try   PTR.from_reader(allocator, reader, size) },
+            .SOA   => ResourceData{ .soa     = try   SOA.from_reader(allocator, reader, size) },
+            .TXT   => ResourceData{ .txt     = try   TXT.from_reader(allocator, reader, size) },
+            .A     => ResourceData{ .a       = try     A.from_reader(allocator, reader, size) },
+            .WKS   => ResourceData{ .wks     = try   WKS.from_reader(allocator, reader, size) },
+            else   => error.TypeNotSupported,
+        };
+    }
+
+    pub fn deinit(self: *const ResourceData) void {
+        switch (self.*) {
+            inline else => |record| record.deinit(),
+        }
+    }
+
     pub const CNAME = struct {
         /// A domain name which specifies the canonical or primary name
         /// for the owner. The owner name is an alias.
@@ -512,9 +603,20 @@ pub const ResourceData = union(enum) {
         pub fn to_writer(self: *const CNAME, writer: anytype) !void {
             try self.cname.to_writer(writer);
         }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !CNAME {
+            return .{
+                .cname = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const CNAME) void {
+            self.cname.deinit();
+        }
     };
 
     pub const HINFO = struct {
+        allocator: mem.Allocator,
         /// A string which specifies the CPU type.
         cpu: []const u8,
         /// A string which specifies the operating system type.
@@ -526,6 +628,21 @@ pub const ResourceData = union(enum) {
             try writer.writeAll(self.os);
             try writer.writeByte(0);
         }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !HINFO {
+            const cpu = try reader.readUntilDelimiterAlloc(allocator, 0, size);
+            const os = try reader.readUntilDelimiterAlloc(allocator, 0, size - cpu.len);
+            return .{
+                .allocator = allocator,
+                .cpu = cpu,
+                .os = os,
+            };
+        }
+
+        pub fn deinit(self: *const HINFO) void {
+            self.allocator.free(self.cpu);
+            self.allocator.free(self.os);
+        }
     };
 
     pub const MB = struct {
@@ -535,6 +652,16 @@ pub const ResourceData = union(enum) {
 
         pub fn to_writer(self: *const MB, writer: anytype) !void {
             try self.madname.to_writer(writer);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !MB {
+            return .{
+                .madname = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const MB) void {
+            self.madname.deinit();
         }
     };
 
@@ -547,6 +674,16 @@ pub const ResourceData = union(enum) {
         pub fn to_writer(self: *const MD, writer: anytype) !void {
             try self.madname.to_writer(writer);
         }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !MD {
+            return .{
+                .madname = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const MD) void {
+            self.madname.deinit();
+        }
     };
 
     pub const MF = struct {
@@ -558,6 +695,16 @@ pub const ResourceData = union(enum) {
         pub fn to_writer(self: *const MF, writer: anytype) !void {
             try self.madname.to_writer(writer);
         }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !MF {
+            return .{
+                .madname = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const MF) void {
+            self.madname.deinit();
+        }
     };
 
     pub const MG = struct {
@@ -567,6 +714,16 @@ pub const ResourceData = union(enum) {
 
         pub fn to_writer(self: *const MG, writer: anytype) !void {
             try self.madname.to_writer(writer);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !MG {
+            return .{
+                .madname = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const MG) void {
+            self.madname.deinit();
         }
     };
 
@@ -590,6 +747,18 @@ pub const ResourceData = union(enum) {
             try self.rmailbx.to_writer(writer);
             try self.emailbx.to_writer(writer);
         }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !MINFO {
+            return .{
+                .rmailbx = try DomainName.from_reader(allocator, reader),
+                .emailbx = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const MINFO) void {
+            self.rmailbx.deinit();
+            self.emailbx.deinit();
+        }
     };
 
     pub const MR = struct {
@@ -599,6 +768,16 @@ pub const ResourceData = union(enum) {
 
         pub fn to_writer(self: *const MR, writer: anytype) !void {
             try self.madname.to_writer(writer);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !MR {
+            return .{
+                .madname = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const MR) void {
+            self.madname.deinit();
         }
     };
 
@@ -614,13 +793,41 @@ pub const ResourceData = union(enum) {
             try writer.writeIntBig(u16, self.preference);
             try self.exchange.to_writer(writer);
         }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !MX {
+            return .{
+                .preference = try reader.readIntBig(u16),
+                .exchange = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const MX) void {
+            self.exchange.deinit();
+        }
     };
 
     pub const NULL = struct {
+        allocator: mem.Allocator,
         data: []const u8,
 
         pub fn to_writer(self: *const NULL, writer: anytype) !void {
             try writer.writeAll(self.data);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !NULL {
+            var data = try allocator.alloc(u8, size);
+            const len = try reader.readAll(data);
+            if (len < size) {
+                return error.EndOfStream;
+            }
+            return .{
+                .allocator = allocator,
+                .data = data,
+            };
+        }
+
+        pub fn deinit(self: *const NULL) void {
+            self.allocator.free(self.data);
         }
     };
 
@@ -632,6 +839,16 @@ pub const ResourceData = union(enum) {
         pub fn to_writer(self: *const NS, writer: anytype) !void {
             try self.nsdname.to_writer(writer);
         }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !NS {
+            return .{
+                .nsdname = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const NS) void {
+            self.nsdname.deinit();
+        }
     };
 
     pub const PTR = struct {
@@ -641,6 +858,16 @@ pub const ResourceData = union(enum) {
 
         pub fn to_writer(self: *const PTR, writer: anytype) !void {
             try self.ptrdname.to_writer(writer);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !PTR {
+            return .{
+                .ptrdname = try DomainName.from_reader(allocator, reader),
+            };
+        }
+
+        pub fn deinit(self: *const PTR) void {
+            self.ptrdname.deinit();
         }
     };
 
@@ -676,15 +903,49 @@ pub const ResourceData = union(enum) {
             try writer.writeIntBig(i32, self.expire);
             try writer.writeIntBig(u32, self.minimum);
         }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !SOA {
+            return .{
+                .mname = try DomainName.from_reader(allocator, reader),
+                .rname = try DomainName.from_reader(allocator, reader),
+                .serial = try reader.readIntBig(u32),
+                .refresh = try reader.readIntBig(i32),
+                .retry = try reader.readIntBig(i32),
+                .expire = try reader.readIntBig(i32),
+                .minimum = try reader.readIntBig(u32),
+            };
+        }
+
+        pub fn deinit(self: *const SOA) void {
+            self.mname.deinit();
+            self.rname.deinit();
+        }
     };
 
     pub const TXT = struct {
+        allocator: mem.Allocator,
         /// One or more strings.
         txt_data: []const u8,
 
         pub fn to_writer(self: *const TXT, writer: anytype) !void {
             try writer.writeAll(self.txt_data);
             try writer.writeByte(0);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !TXT {
+            var txt = try allocator.alloc(u8, size);
+            const len = try reader.readAll(txt);
+            if (len < size) {
+                return error.EndOfStream;
+            }
+            return .{
+                .allocator = allocator,
+                .txt_data = txt,
+            };
+        }
+
+        pub fn deinit(self: *const TXT) void {
+            self.allocator.free(self.txt_data);
         }
     };
 
@@ -697,9 +958,23 @@ pub const ResourceData = union(enum) {
             try writer.writeAll(&self.address);
             // try writer.writeIntBig(u32, self.address.sa.addr);
         }
+
+        pub fn from_reader(_: mem.Allocator, reader: anytype, _: u16) !A {
+            var address = [4]u8{ 0, 0, 0, 0 };
+            const len = try reader.readAll(&address);
+            if (len < 4) {
+                return error.EndOfStream;
+            }
+            return .{
+                .address = address,
+            };
+        }
+
+        pub fn deinit(_: *const A) void {}
     };
 
     pub const WKS = struct {
+        allocator: mem.Allocator,
         /// An internet address
         address: [4]u8,
         /// An IP protocol number
@@ -711,6 +986,30 @@ pub const ResourceData = union(enum) {
             try writer.writeAll(&self.address);
             try writer.writeByte(self.protocol);
             try writer.writeAll(self.bit_map);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !WKS {
+            var address = [4]u8{ 0, 0, 0, 0 };
+            const addr_len = try reader.readAll(&address);
+            if (addr_len < size) {
+                return error.EndOfStream;
+            }
+            const protocol = try reader.readByte();
+            var bit_map = try allocator.alloc(u8, size - 5);
+            const bm_len = try reader.readAll(bit_map);
+            if (bm_len + 5 < size) {
+                return error.EndOfStream;
+            }
+            return .{
+                .allocator = allocator,
+                .address = address,
+                .protocol = protocol,
+                .bit_map = bit_map,
+            };
+        }
+
+        pub fn deinit(self: *const WKS) void {
+            self.allocator.free(self.bit_map);
         }
     };
 };
