@@ -26,7 +26,6 @@ pub fn main() anyerror!void {
     var message_bytes = std.ArrayList(u8).init(allocator);
     defer message_bytes.deinit();
 
-    std.debug.print("message: {}\n", .{ message });
     try message.to_writer(message_bytes.writer());
 
     std.debug.print("Sending bytes: {any}\n", .{ message_bytes.items });
@@ -67,8 +66,6 @@ pub fn createQuery(allocator: mem.Allocator, address: []const u8, qtype: QType) 
     };
     var questions = try allocator.alloc(Question, 1);
     questions[0] = question;
-
-    std.debug.print("question: {any}", .{ questions });
 
     const message = Message{
         .allocator = allocator,
