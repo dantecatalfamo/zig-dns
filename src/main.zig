@@ -156,18 +156,18 @@ pub const Message = struct {
         _ = fmt;
         _ = options;
         try writer.print("DNS Message {{\n", .{});
-        try writer.print("{any}\n", .{ self.header });
+        try writer.print("{any}", .{ self.header });
         for (self.questions) |question| {
-            try writer.print("{any}\n", .{ question });
+            try writer.print("{any}", .{ question });
         }
         for (self.answers) |answer| {
-            try writer.print("{any}\n", .{ answer });
+            try writer.print("{any}", .{ answer });
         }
         for (self.authorities) |authority| {
-            try writer.print("{any}\n", .{ authority });
+            try writer.print("{any}", .{ authority });
         }
         for (self.additional) |addition| {
-            try writer.print("{any}\n", .{ addition });
+            try writer.print("{any}", .{ addition });
         }
         try writer.print("}}\n", .{});
     }
@@ -354,6 +354,17 @@ pub const Question = struct {
     pub fn deinit(self: *const Question) void {
         self.qname.deinit();
     }
+
+    pub fn format(self: *const Question, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print("Question {{\n", .{});
+        try writer.print("  Name: {}\n", .{ self.qname });
+        try writer.print("  QType: {}\n", .{ self.qtype });
+        try writer.print("  QClass: {}\n", .{ self.qclass });
+        try writer.print("}}\n", .{});
+    }
 };
 
 pub const ResourceRecord = struct {
@@ -399,6 +410,20 @@ pub const ResourceRecord = struct {
     pub fn deinit(self: *const ResourceRecord) void {
         self.name.deinit();
         self.resource_data.deinit();
+    }
+
+    pub fn format(self: *const ResourceRecord, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt;
+        _ = options;
+
+        try writer.print("Resource Record {{\n", .{});
+        try writer.print("  Name: {}\n", .{ self.name });
+        try writer.print("  Type: {}\n", .{ self.@"type" });
+        try writer.print("  Class: {}\n", .{ self.class });
+        try writer.print("  TTL: {d}\n", .{ self.ttl });
+        try writer.print("  Resource Data Length: {d}\n", .{ self.resource_data_length });
+        try writer.print("  Resource Data: {}", .{ self.resource_data });
+        try writer.print("}}\n", .{});
     }
 };
 
@@ -624,8 +649,27 @@ pub const DomainName = struct {
                 },
             }
         }
-
         return string.toOwnedSlice();
+    }
+
+    pub fn format(self: *const DomainName, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt;
+        _ = options;
+
+        for (self.labels) |label| {
+            switch (label) {
+                .text => |text| {
+                    if (text.len == 0) {
+                        continue;
+                    }
+                    try writer.print("{s}.", .{ text });
+                },
+                .compressed => |pointer| {
+                    try writer.print("Pointer<{d}>", .{ pointer });
+                },
+            }
+        }
+
     }
 
     pub fn deinit(self: *const DomainName) void {
@@ -655,8 +699,8 @@ pub const DomainName = struct {
         };
 
         pub const PointerComponents = packed struct {
-            upper: u6,
             lower: u8,
+            upper: u6,
         };
 
         pub const Length = u6;
