@@ -151,6 +151,26 @@ pub const Message = struct {
         }
         self.allocator.free(self.additional);
     }
+
+    pub fn format(self: *const Message, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt;
+        _ = options;
+        try writer.print("DNS Message {{\n", .{});
+        try writer.print("{any}\n", .{ self.header });
+        for (self.questions) |question| {
+            try writer.print("{any}\n", .{ question });
+        }
+        for (self.answers) |answer| {
+            try writer.print("{any}\n", .{ answer });
+        }
+        for (self.authorities) |authority| {
+            try writer.print("{any}\n", .{ authority });
+        }
+        for (self.additional) |addition| {
+            try writer.print("{any}\n", .{ addition });
+        }
+        try writer.print("}}\n", .{});
+    }
 };
 
 pub const Header = packed struct (u96) {
@@ -264,6 +284,22 @@ pub const Header = packed struct (u96) {
     pub fn to_writer(self: *const Header, writer: anytype) !void {
         const header = self.to_bytes();
         try writer.writeAll(header);
+    }
+
+    pub fn format(self: *const Header, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt;
+        _ = options;
+        try writer.print("Header {{\n", .{});
+        try writer.print("  ID: {d}\n", .{ self.id });
+        try writer.print("  Response: {}\n", .{ self.response });
+        try writer.print("  OpCode: {}\n", .{ self.opcode });
+        try writer.print("  Authoritative Answer: {}\n", .{ self.authoritative_answer });
+        try writer.print("  Truncation: {}\n", .{ self.truncation });
+        try writer.print("  Recursion Desired: {}\n", .{ self.recursion_desired });
+        try writer.print("  Recursion Available: {}\n", .{ self.recursion_available });
+        try writer.print("  Z: {d}\n", .{ self.z });
+        try writer.print("  Response Code: {}\n", .{ self.response_code });
+        try writer.print("}}\n", .{});
     }
 };
 
