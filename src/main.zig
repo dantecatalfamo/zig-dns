@@ -540,6 +540,15 @@ pub const DomainName = struct {
     pub fn from_string(allocator: mem.Allocator, name: []const u8) !DomainName {
         var iter = mem.split(u8, name, ".");
         var labels = LabelList.init(allocator);
+        errdefer {
+            for (labels.items) |label| {
+                switch (label) {
+                    .text => |text| allocator.free(text),
+                    else => {},
+                }
+            }
+            labels.deinit();
+        }
         while (iter.next()) |text| {
             if (text.len == 0)
                 break;
@@ -888,6 +897,7 @@ pub const ResourceData = union(enum) {
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !NULL {
             var data = try allocator.alloc(u8, size);
+            errdefer allocator.free(data);
             const len = try reader.readAll(data);
             if (len < size) {
                 return error.EndOfStream;
@@ -1006,6 +1016,7 @@ pub const ResourceData = union(enum) {
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !TXT {
             var txt = try allocator.alloc(u8, size);
+            errdefer allocator.free(txt);
             const len = try reader.readAll(txt);
             if (len < size) {
                 return error.EndOfStream;
@@ -1068,6 +1079,7 @@ pub const ResourceData = union(enum) {
             }
             const protocol = try reader.readByte();
             var bit_map = try allocator.alloc(u8, size - 5);
+            errdefer allocator.free(bit_map);
             const bm_len = try reader.readAll(bit_map);
             if (bm_len + 5 < size) {
                 return error.EndOfStream;
