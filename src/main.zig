@@ -450,14 +450,24 @@ pub const DomainName = struct {
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !DomainName {
         var labels = LabelList.init(allocator);
         var header_byte = try reader.readByte();
-        while (true) {
+        errdefer {
+            for (labels.items) |label| {
+                switch (label) {
+                    .text => |text| allocator.free(text),
+                    else => {},
+                }
+            }
+            labels.deinit();
+        }
+        outer: while (true) {
             switch (@intToEnum(Label.Options, header_byte >> 6)) {
                 .text => {
                     const header = @bitCast(Label.TextHeader, header_byte);
                     if (header.length == 0) {
-                        break;
+                        break :outer;
                     }
                     var string = try allocator.alloc(u8, header.length);
+                    errdefer allocator.free(string);
                     const string_length = try reader.readAll(string);
                     if (string_length < header.length) {
                         return error.EndOfStream;
@@ -477,12 +487,13 @@ pub const DomainName = struct {
                         .compressed = pointer,
                     };
                     try labels.append(label);
-                    break;
+                    break :outer;
                 },
                 else => {
                     return error.UnsupportedLabel;
                 },
             }
+            header_byte = try reader.readByte();
         }
 
         const empty = Label{
@@ -552,7 +563,7 @@ pub const DomainName = struct {
     pub fn deinit(self: *const DomainName) void {
         for (self.labels) |label| {
             switch (label) {
-                .text => |text| self.allocator.free(text),
+                .text => self.allocator.free(label.text),
                 else => {},
             }
         }
