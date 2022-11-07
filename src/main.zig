@@ -16,7 +16,6 @@ pub fn main() anyerror!void {
     var allocator = gpa.allocator();
     try network.init();
     defer network.deinit();
-    std.log.info("All your codebase are belong to us.", .{});
     const sock = try network.connectToHost(allocator, "192.168.0.23", 53, .udp);
     defer sock.close();
     const writer = sock.writer();
@@ -58,6 +57,7 @@ pub fn main() anyerror!void {
     try message.to_writer(message_bytes.writer());
 
     std.debug.print("Sending bytes: {any}\n", .{ message_bytes.items });
+    std.debug.print("Query: {}", .{ message });
     try writer.writeAll(message_bytes.items);
     var recv = [_]u8{0} ** 1024;
     const recv_size = try sock.receive(&recv);
@@ -65,7 +65,7 @@ pub fn main() anyerror!void {
     var recv_buffer = std.io.fixedBufferStream(recv[0..recv_size]);
     const response = try Message.from_reader(allocator, recv_buffer.reader());
     defer response.deinit();
-    std.debug.print("{any}\n", .{ response });
+    std.debug.print("Response: {any}\n", .{ response });
 }
 
 pub const Message = struct {
@@ -155,7 +155,7 @@ pub const Message = struct {
     pub fn format(self: *const Message, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
         _ = fmt;
         _ = options;
-        try writer.print("DNS Message {{\n", .{});
+        try writer.print("Message {{\n", .{});
         try writer.print("{any}", .{ self.header });
         for (self.questions) |question| {
             try writer.print("{any}", .{ question });
@@ -422,7 +422,7 @@ pub const ResourceRecord = struct {
         try writer.print("  Class: {}\n", .{ self.class });
         try writer.print("  TTL: {d}\n", .{ self.ttl });
         try writer.print("  Resource Data Length: {d}\n", .{ self.resource_data_length });
-        try writer.print("  Resource Data: {}", .{ self.resource_data });
+        try writer.print("  Resource Data: {}\n", .{ self.resource_data });
         try writer.print("}}\n", .{});
     }
 };
