@@ -20,6 +20,28 @@ pub fn main() anyerror!void {
     defer sock.close();
     const writer = sock.writer();
 
+    const message = try createQuery(allocator, "lambda.cx", @intToEnum(QType, @enumToInt(Type.A)));
+    defer message.deinit();
+
+    var message_bytes = std.ArrayList(u8).init(allocator);
+    defer message_bytes.deinit();
+
+    std.debug.print("message: {}\n", .{ message });
+    try message.to_writer(message_bytes.writer());
+
+    std.debug.print("Sending bytes: {any}\n", .{ message_bytes.items });
+    std.debug.print("Query: {}", .{ message });
+    try writer.writeAll(message_bytes.items);
+    var recv = [_]u8{0} ** 1024;
+    const recv_size = try sock.receive(&recv);
+    std.debug.print("Recv: {any}\n", .{ recv[0..recv_size] });
+    var recv_buffer = std.io.fixedBufferStream(recv[0..recv_size]);
+    const response = try Message.from_reader(allocator, recv_buffer.reader());
+    defer response.deinit();
+    std.debug.print("Response: {any}\n", .{ response });
+}
+
+pub fn createQuery(allocator: mem.Allocator, address: []const u8, qtype: QType) !Message {
     const header = Header{
         .id = 1,
         .response = false,
@@ -36,36 +58,28 @@ pub fn main() anyerror!void {
         .additional_record_count = 0,
     };
 
-    const domain = try DomainName.from_string(allocator, "lambda.cx");
-    defer domain.deinit();
+    const domain = try DomainName.from_string(allocator, address);
+
     const question = Question{
         .qname = domain,
-        .qtype = @intToEnum(QType, @enumToInt(Type.A)),
+        .qtype = qtype,
         .qclass = @intToEnum(QClass, @enumToInt(Class.IN)),
     };
-    const questions = [_]Question{ question };
+    var questions = try allocator.alloc(Question, 1);
+    questions[0] = question;
+
+    std.debug.print("question: {any}", .{ questions });
+
     const message = Message{
         .allocator = allocator,
         .header = header,
-        .questions = &questions,
+        .questions = questions,
         .answers = &.{},
         .authorities = &.{},
         .additional = &.{}
     };
-    var message_bytes = std.ArrayList(u8).init(allocator);
-    defer message_bytes.deinit();
-    try message.to_writer(message_bytes.writer());
 
-    std.debug.print("Sending bytes: {any}\n", .{ message_bytes.items });
-    std.debug.print("Query: {}", .{ message });
-    try writer.writeAll(message_bytes.items);
-    var recv = [_]u8{0} ** 1024;
-    const recv_size = try sock.receive(&recv);
-    std.debug.print("Recv: {any}\n", .{ recv[0..recv_size] });
-    var recv_buffer = std.io.fixedBufferStream(recv[0..recv_size]);
-    const response = try Message.from_reader(allocator, recv_buffer.reader());
-    defer response.deinit();
-    std.debug.print("Response: {any}\n", .{ response });
+    return message;
 }
 
 pub const Message = struct {
@@ -601,6 +615,7 @@ pub const DomainName = struct {
     pub fn from_string(allocator: mem.Allocator, name: []const u8) !DomainName {
         var iter = mem.split(u8, name, ".");
         var labels = LabelList.init(allocator);
+
         errdefer {
             for (labels.items) |label| {
                 switch (label) {
@@ -610,6 +625,7 @@ pub const DomainName = struct {
             }
             labels.deinit();
         }
+
         while (iter.next()) |text| {
             if (text.len == 0)
                 break;
