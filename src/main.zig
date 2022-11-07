@@ -569,6 +569,29 @@ pub const DomainName = struct {
         };
     }
 
+    pub fn to_string(self: *const DomainName, allocator: mem.Allocator) ![]const u8 {
+        var string = std.ArrayList(u8).init(allocator);
+        errdefer string.deinit();
+
+        for (self.labels) |label| {
+            switch (label) {
+                .text => |text| {
+                    if (text.len == 0) {
+                        continue;
+                    }
+                    try string.appendSlice(text);
+                    try string.appendSlice(".");
+                },
+                .compressed => |pointer| {
+                    var writer = string.writer();
+                    try writer.print("Pointer<{d}>", .{ pointer });
+                },
+            }
+        }
+
+        return string.toOwnedSlice();
+    }
+
     pub fn deinit(self: *const DomainName) void {
         for (self.labels) |label| {
             switch (label) {
