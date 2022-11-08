@@ -660,6 +660,7 @@ pub const DomainName = struct {
             try labels.append(label);
         }
         const empty = try allocator.alloc(u8, 0);
+        errdefer allocator.free(empty);
         const label = Label{
             .text = empty,
         };
@@ -1202,6 +1203,7 @@ pub const ResourceData = union(enum) {
             var bytes_read: usize = 0;
             while (bytes_read < size) {
                 var txt = try allocator.alloc(u8, try reader.readByte());
+                errdefer allocator.free(txt);
                 const txt_len = try reader.readAll(txt);
                 if (txt_len < txt.len) {
                     return error.EndOfStream;
@@ -1333,6 +1335,7 @@ pub const ResourceData = union(enum) {
             var counting_reader = io.countingReader(reader);
             const mbox = try DomainName.from_reader(allocator, counting_reader.reader());
             const txt = try allocator.alloc(u8, size - @intCast(u16, counting_reader.bytes_read));
+            errdefer allocator.free(txt);
             const txt_length = try reader.readAll(txt);
             if (txt_length + counting_reader.bytes_read < size) {
                 return error.EndOfStream;
