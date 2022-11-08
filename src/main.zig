@@ -23,7 +23,7 @@ pub fn main() anyerror!void {
     defer sock.close();
     const writer = sock.writer();
 
-    const message = try createQuery(allocator, "lambda.cx", @intToEnum(QType, 1));
+    const message = try createQuery(allocator, "lambda.cx", @intToEnum(QType, @enumToInt(Type.A)));
     defer message.deinit();
 
     var message_bytes = std.ArrayList(u8).init(allocator);
@@ -492,6 +492,8 @@ pub const Type = enum (u16) {
     RP = 17,
     /// An IPv6 host address
     AAAA = 28,
+    /// Location information
+    LOC = 29,
     /// Service locator
     SRV = 33,
     /// SSH Fingerprint
@@ -787,6 +789,7 @@ pub const ResourceData = union(enum) {
     wks: WKS,
     rp: RP,
     aaaa: AAAA,
+    loc: LOC,
     srv: SRV,
     sshfp: SSHFP,
     uri: URI,
@@ -818,6 +821,7 @@ pub const ResourceData = union(enum) {
             .WKS   => ResourceData{ .wks     = try     WKS.from_reader(allocator, reader, size) },
             .RP    => ResourceData{ .rp      = try      RP.from_reader(allocator, reader, size) },
             .AAAA  => ResourceData{ .aaaa    = try    AAAA.from_reader(allocator, reader, size) },
+            .LOC   => ResourceData{ .loc     = try     LOC.from_reader(allocator, reader, size) },
             .SRV   => ResourceData{ .srv     = try     SRV.from_reader(allocator, reader, size) },
             .SSHFP => ResourceData{ .sshfp   = try   SSHFP.from_reader(allocator, reader, size) },
             else   => ResourceData{ .unknown = try Unknown.from_reader(allocator, reader, size) },
@@ -1507,8 +1511,104 @@ pub const ResourceData = union(enum) {
             self.allocator.free(self.target);
         }
     };
-};
 
+    pub const LOC = struct {
+        /// Version number of the representation.  This must be zero.
+        version: u8,
+        /// The diameter of a sphere enclosing the described entity,
+        /// in centimeters.
+        size: TinyInt,
+        /// The horizontal precision of the data, in centimeters.
+        /// This is the diameter of the horizontal "circle of error",
+        /// rather than a "plus or minus" value. To get a "plus or
+        /// minus" value, divide by 2.
+        horizontal_precision: TinyInt,
+        /// The vertical precision of the data, in centimeters.
+        /// This is the total potential vertical error, rather than a
+        /// "plus or minus" value. To get a "plus or minus" value,
+        /// divide by 2. Note that if altitude above or below sea
+        /// level is used as an approximation for altitude relative to
+        /// the [WGS 84] ellipsoid, the precision value should be
+        /// adjusted.
+        vertical_precision: TinyInt,
+        /// The latitude of the center of the sphere described by the
+        /// size field, in thousandths of a second of arc. 2^31
+        /// represents the equator; numbers above that are north
+        /// latitude.
+        latitude: i32,
+        /// The longitude of the center of the sphere described by the
+        /// size field, in thousandths of a second of arc, rounded
+        /// away from the prime meridian. 2^31 represents the prime
+        /// meridian; numbers above that are east longitude.
+        longitude: i32,
+        /// The altitude of the center of the sphere described by the
+        /// size field, in centimeters, from a base of 100,000m below
+        /// the [WGS 84] reference spheroid used by GPS (semimajor
+        /// axis a=6378137.0, reciprocal flattening rf=298.257223563).
+        /// Altitude above (or below) sea level may be used as an
+        /// approximation of altitude relative to the the [WGS 84]
+        /// spheroid, though due to the Earth's surface not being a
+        /// perfect spheroid, there will be differences. (For example,
+        /// the geoid (which sea level approximates) for the
+        /// continental US ranges from 10 meters to 50 meters below
+        /// the [WGS 84] spheroid. Adjustments to altitude and/or
+        /// vertical precision will be necessary in most cases. The
+        /// Defense Mapping Agency publishes geoid height values
+        /// relative to the [WGS 84] ellipsoid.
+        altitude: i32,
+
+        const TinyInt = packed struct (u8) {
+            power: u4,
+            base: u4,
+
+            pub fn from_int(n: u32) TinyInt {
+                const power = std.math.log10(n);
+                const base = n / std.math.pow(u32, 10, power);
+
+                return .{
+                    .power = @intCast(u4, power),
+                    .base = @intCast(u4, base),
+                };
+            }
+
+            pub fn to_int(self: *const TinyInt) u32 {
+                return self.base * (std.math.pow(u32, 10, self.power));
+            }
+        };
+
+        pub fn to_writer(self: *const LOC, writer: anytype) !void {
+            try writer.writeByte(self.version);
+            try writer.writeByte(@bitCast(u8, self.size));
+            try writer.writeByte(@bitCast(u8, self.horizontal_precision));
+            try writer.writeByte(@bitCast(u8, self.vertical_precision));
+            try writer.writeIntBig(i32, self.latitude);
+            try writer.writeIntBig(i32, self.longitude);
+            try writer.writeIntBig(i32, self.altitude);
+        }
+
+        pub fn from_reader(_: mem.Allocator, reader: anytype, _: u16) !LOC {
+            const version = try reader.readByte();
+            const size = @bitCast(TinyInt, try reader.readByte());
+            const horizontal_precision = @bitCast(TinyInt, try reader.readByte());
+            const vertical_prevision = @bitCast(TinyInt, try reader.readByte());
+            const latitude = try reader.readIntBig(i32);
+            const longitude = try reader.readIntBig(i32);
+            const altitude = try reader.readIntBig(i32);
+
+            return .{
+                .version = version,
+                .size = size,
+                .horizontal_precision = horizontal_precision,
+                .vertical_precision = vertical_prevision,
+                .latitude = latitude,
+                .longitude = longitude,
+                .altitude = altitude,
+            };
+        }
+
+        pub fn deinit(_: *const LOC) void {}
+    };
+};
 
 /// Helper for writing errdefer blocks
 fn listDeinit(list: anytype) void {
