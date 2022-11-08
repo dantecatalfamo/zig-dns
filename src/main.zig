@@ -488,6 +488,8 @@ pub const Type = enum (u16) {
     RP = 17,
     /// An IPv6 host address
     AAAA = 28,
+    /// Service locator
+    SRV = 33,
 
     _,
 };
@@ -775,6 +777,7 @@ pub const ResourceData = union(enum) {
     wks: WKS,
     rp: RP,
     aaaa: AAAA,
+    srv: SRV,
     unknown: Unknown,
 
     pub fn to_writer(self: *const ResourceData, writer: anytype) !void {
@@ -803,6 +806,7 @@ pub const ResourceData = union(enum) {
             .WKS   => ResourceData{ .wks     = try     WKS.from_reader(allocator, reader, size) },
             .RP    => ResourceData{ .rp      = try      RP.from_reader(allocator, reader, size) },
             .AAAA  => ResourceData{ .aaaa    = try    AAAA.from_reader(allocator, reader, size) },
+            .SRV   => ResourceData{ .srv     = try     SRV.from_reader(allocator, reader, size) },
             else   => ResourceData{ .unknown = try Unknown.from_reader(allocator, reader, size) },
         };
     }
@@ -1315,6 +1319,46 @@ pub const ResourceData = union(enum) {
         }
 
         pub fn deinit(_: *const AAAA) void {}
+    };
+
+    pub const SRV = struct {
+        /// The priority of this target host. A client MUST attempt to
+        /// contact the target host with the lowest-numbered priority
+        /// it can reach
+        priority: u16,
+        /// A relative weight for entries with the same priority.
+        /// Larger weights SHOULD be given a proportionately higher
+        /// probability of being selected.
+        weight: u16,
+        /// The port on this target host of this service.
+        port: u16,
+        /// The domain name of the target host.
+        target: DomainName,
+
+        pub fn to_writer(self: *const SRV, writer: anytype) !void {
+            try writer.writeIntBig(u16, self.priority);
+            try writer.writeIntBig(u16, self.weight);
+            try writer.writeIntBig(u16, self.port);
+            try self.target.to_writer(writer);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !SRV {
+            const priority = try reader.readIntBig(u16);
+            const weight = try reader.readIntBig(u16);
+            const port = try reader.readIntBig(u16);
+            const target = try DomainName.from_reader(allocator, reader);
+
+            return .{
+                .priority = priority,
+                .weight = weight,
+                .port = port,
+                .target = target,
+            };
+        }
+
+        pub fn deinit(self: *const SRV) void {
+            self.target.deinit();
+        }
     };
 };
 
