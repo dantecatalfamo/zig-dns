@@ -26,7 +26,7 @@ const sock = try network.connectToHost(allocator, "8.8.8.8", 53, .udp);
 defer sock.close();
 const writer = sock.writer();
 
-const message = try dns.createQuery(allocator, "lambda.cx", .@"*");
+const message = try dns.createQuery(allocator, "lambda.cx", @intToEnum(dns.QType, 1));
 defer message.deinit();
 
 var message_bytes = std.ArrayList(u8).init(allocator);
@@ -43,4 +43,35 @@ const response = try Message.from_reader(allocator, recv_buffer.reader());
 defer response.deinit();
 
 std.debug.print("Response: {any}\n", .{ response });
+```
+
+Output:
+
+```
+Response: Message {
+Header {
+  ID: 1
+  Response: true
+  OpCode: main.Header.Opcode.query
+  Authoritative Answer: false
+  Truncation: false
+  Recursion Desired: true
+  Recursion Available: true
+  Z: 0
+  Response Code: main.Header.ResponseCode.no_error
+}
+Question {
+  Name: lambda.cx.
+  QType: main.QType(1)
+  QClass: main.QClass(1)
+}
+Resource Record {
+  Name: Pointer<12>
+  Type: main.Type.A
+  Class: main.Class.IN
+  TTL: 1800
+  Resource Data Length: 4
+  Resource Data: main.ResourceData{ .a = main.ResourceData.A{ .address = { 155, 138, 137, 134 } } }
+}
+}
 ```

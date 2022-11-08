@@ -23,7 +23,7 @@ pub fn main() anyerror!void {
     defer sock.close();
     const writer = sock.writer();
 
-    const message = try createQuery(allocator, "lambda.cx", .@"*");
+    const message = try createQuery(allocator, "lambda.cx", @intToEnum(QType, 1));
     defer message.deinit();
 
     var message_bytes = std.ArrayList(u8).init(allocator);
