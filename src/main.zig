@@ -496,6 +496,8 @@ pub const Type = enum (u16) {
     SRV = 33,
     /// SSH Fingerprint
     SSHFP = 44,
+    /// Uniform Resource Identifier
+    URI = 256,
 
     _,
 };
@@ -595,6 +597,7 @@ pub const DomainName = struct {
         const empty = Label{
             .text = try allocator.alloc(u8, 0),
         };
+        errdefer allocator.free(empty.text);
         try labels.append(empty);
 
         return DomainName{
@@ -785,6 +788,7 @@ pub const ResourceData = union(enum) {
     aaaa: AAAA,
     srv: SRV,
     sshfp: SSHFP,
+    uri: URI,
     unknown: Unknown,
 
     pub fn to_writer(self: *const ResourceData, writer: anytype) !void {
@@ -1455,6 +1459,41 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const SSHFP) void {
             self.allocator.free(self.fingerprint);
+        }
+    };
+
+    pub const URI = struct {
+        allocator: mem.Allocator,
+        priority: u16,
+        weight: u16,
+        target: []const u8,
+
+        pub fn to_writer(self: *const URI, writer: anytype) !void {
+            try writer.writeIntBig(u16, self.priority);
+            try writer.writeIntBig(u16, self.weight);
+            try writer.writeAll(self.target);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !URI {
+            const priority = try reader.readIntBig(u16);
+            const weight = try reader.readIntBig(u16);
+            var target = allocator.alloc(u8, size - 4);
+            errdefer allocator.free(target);
+            const length = try reader.readAll(target);
+            if (length + 4 < size) {
+                return error.EndOfStream;
+            }
+
+            return .{
+                .allocator = allocator,
+                .priority = priority,
+                .weight = weight,
+                .target = target,
+            };
+        }
+
+        pub fn deinit(self: *const URI) void {
+            self.allocator.free(self.target);
         }
     };
 };
