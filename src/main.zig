@@ -1230,9 +1230,7 @@ pub const ResourceData = union(enum) {
         address: [4]u8,
 
         pub fn to_writer(self: *const A, writer: anytype) !void {
-            // XXX This may be incorrect endianness
             try writer.writeAll(&self.address);
-            // try writer.writeIntBig(u32, self.address.sa.addr);
         }
 
         pub fn from_reader(_: mem.Allocator, reader: anytype, _: u16) !A {
