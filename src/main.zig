@@ -486,6 +486,8 @@ pub const Type = enum (u16) {
     TXT = 16,
     /// Responsible Person
     RP = 17,
+    /// An IPv6 host address
+    AAAA = 28,
 
     _,
 };
@@ -772,6 +774,7 @@ pub const ResourceData = union(enum) {
     a: A,
     wks: WKS,
     rp: RP,
+    aaaa: AAAA,
     unknown: Unknown,
 
     pub fn to_writer(self: *const ResourceData, writer: anytype) !void {
@@ -799,6 +802,7 @@ pub const ResourceData = union(enum) {
             .A     => ResourceData{ .a       = try       A.from_reader(allocator, reader, size) },
             .WKS   => ResourceData{ .wks     = try     WKS.from_reader(allocator, reader, size) },
             .RP    => ResourceData{ .rp      = try      RP.from_reader(allocator, reader, size) },
+            .AAAA  => ResourceData{ .aaaa    = try    AAAA.from_reader(allocator, reader, size) },
             else   => ResourceData{ .unknown = try Unknown.from_reader(allocator, reader, size) },
         };
     }
@@ -1290,6 +1294,27 @@ pub const ResourceData = union(enum) {
             self.allocator.free(self.txt_dname);
             self.mbox_dname.deinit();
         }
+    };
+
+    pub const AAAA = struct {
+        address: [16]u8,
+
+        pub fn to_writer(self: *const AAAA, writer: anytype) !void {
+            try writer.writeAll(&self.address);
+        }
+
+        pub fn from_reader(_: mem.Allocator, reader: anytype, _: u16) !AAAA {
+            var address: [16]u8 = undefined;
+            const length = try reader.readAll(&address);
+            if (length < 16) {
+                return error.EndOfStream;
+            }
+            return .{
+                .address = address,
+            };
+        }
+
+        pub fn deinit(_: *const AAAA) void {}
     };
 };
 
