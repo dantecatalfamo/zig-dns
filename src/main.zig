@@ -16,7 +16,7 @@ pub fn main() anyerror!void {
     var allocator = gpa.allocator();
     try network.init();
     defer network.deinit();
-    const sock = try network.connectToHost(allocator, "192.168.0.23", 53, .udp);
+    const sock = try network.connectToHost(allocator, "8.8.8.8", 53, .udp);
     defer sock.close();
     const writer = sock.writer();
 
@@ -107,6 +107,8 @@ pub const Message = struct {
         var header = try Header.from_reader(reader);
 
         var questions = QuestionList.init(allocator);
+        errdefer listDeinit(questions);
+
         var q_idx: usize = 0;
         while (q_idx < header.question_count) : (q_idx += 1) {
             const question = try Question.from_reader(allocator, reader);
@@ -114,6 +116,8 @@ pub const Message = struct {
         }
 
         var answers = ResourceRecordList.init(allocator);
+        errdefer listDeinit(answers);
+
         var ans_idx: usize = 0;
         while (ans_idx < header.answer_count) : (ans_idx += 1) {
             const answer = try ResourceRecord.from_reader(allocator, reader);
@@ -121,6 +125,8 @@ pub const Message = struct {
         }
 
         var authorities = ResourceRecordList.init(allocator);
+        errdefer listDeinit(authorities);
+
         var auth_idx: usize = 0;
         while (auth_idx < header.name_server_count) : (auth_idx += 1) {
             const authority = try ResourceRecord.from_reader(allocator, reader);
@@ -128,6 +134,8 @@ pub const Message = struct {
         }
 
         var additional = ResourceRecordList.init(allocator);
+        errdefer listDeinit(additional);
+
         var add_idx: usize = 0;
         while (add_idx < header.additional_record_count) : (add_idx += 1) {
             const addit = try ResourceRecord.from_reader(allocator, reader);
@@ -402,6 +410,7 @@ pub const ResourceRecord = struct {
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !ResourceRecord {
         const name = try DomainName.from_reader(allocator, reader);
+        errdefer name.deinit();
         const resource_type = @intToEnum(Type, try reader.readIntBig(u16));
         const class = @intToEnum(Class, try reader.readIntBig(u16));
         const ttl = try reader.readIntBig(i32);
@@ -1213,6 +1222,15 @@ pub const ResourceData = union(enum) {
         }
     };
 };
+
+
+/// Helper for writing errdefer blocks
+fn listDeinit(list: anytype) void {
+    for (list.items) |item| {
+        item.deinit();
+    }
+    list.deinit();
+}
 
 test "ref all decls" {
     std.testing.refAllDeclsRecursive(@This());
