@@ -490,6 +490,8 @@ pub const Type = enum (u16) {
     AAAA = 28,
     /// Service locator
     SRV = 33,
+    /// SSH Fingerprint
+    SSHFP = 44,
 
     _,
 };
@@ -778,6 +780,7 @@ pub const ResourceData = union(enum) {
     rp: RP,
     aaaa: AAAA,
     srv: SRV,
+    sshfp: SSHFP,
     unknown: Unknown,
 
     pub fn to_writer(self: *const ResourceData, writer: anytype) !void {
@@ -807,6 +810,7 @@ pub const ResourceData = union(enum) {
             .RP    => ResourceData{ .rp      = try      RP.from_reader(allocator, reader, size) },
             .AAAA  => ResourceData{ .aaaa    = try    AAAA.from_reader(allocator, reader, size) },
             .SRV   => ResourceData{ .srv     = try     SRV.from_reader(allocator, reader, size) },
+            .SSHFP => ResourceData{ .sshfp   = try   SSHFP.from_reader(allocator, reader, size) },
             else   => ResourceData{ .unknown = try Unknown.from_reader(allocator, reader, size) },
         };
     }
@@ -1358,6 +1362,57 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const SRV) void {
             self.target.deinit();
+        }
+    };
+
+    pub const SSHFP = struct {
+        allocator: mem.Allocator,
+        /// The algorithm of the public key.
+        algorithm: Algorithm,
+        /// The message-digest algorithm used to calculate the
+        /// fingerprint of the public key.
+        fingerprint_type: FingerprintType,
+        /// Hexadecimal representation of the hash result, as text.
+        fingerprint: []const u8,
+
+        const Algorithm = enum(u8) {
+            RSA = 1,
+            DSA = 2,
+            ECDSA = 3,
+            Ed25519 = 4,
+            Ed448 = 5,
+        };
+
+        const FingerprintType = enum(u8) {
+            SHA1 = 1,
+            SHA256 = 2,
+        };
+
+        pub fn to_writer(self: *const SSHFP, writer: anytype) !void {
+            try writer.writeByte(@enumToInt(self.algorithm));
+            try writer.writeByte(@enumToInt(self.fingerprint_type));
+            try writer.writeAll(self.fingerprint);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !SSHFP {
+            const algorithm = @intToEnum(Algorithm, try reader.readByte());
+            const fingerprint_type = @intToEnum(FingerprintType, try reader.readByte());
+            var fingerprint = try allocator.alloc(u8, size - 2);
+            const length = try reader.readAll(fingerprint);
+            if (length + 2 < size) {
+                return error.EndOfStream;
+            }
+
+            return .{
+                .allocator = allocator,
+                .algorithm = algorithm,
+                .fingerprint_type = fingerprint_type,
+                .fingerprint = fingerprint,
+            };
+        }
+
+        pub fn deinit(self: *const SSHFP) void {
+            self.allocator.free(self.fingerprint);
         }
     };
 };
