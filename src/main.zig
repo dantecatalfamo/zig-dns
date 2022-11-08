@@ -1444,6 +1444,7 @@ pub const ResourceData = union(enum) {
             const algorithm = @intToEnum(Algorithm, try reader.readByte());
             const fingerprint_type = @intToEnum(FingerprintType, try reader.readByte());
             var fingerprint = try allocator.alloc(u8, size - 2);
+            errdefer allocator.free(fingerprint);
             const length = try reader.readAll(fingerprint);
             if (length + 2 < size) {
                 return error.EndOfStream;
