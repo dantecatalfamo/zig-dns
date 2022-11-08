@@ -20,7 +20,7 @@ pub fn main() anyerror!void {
     defer sock.close();
     const writer = sock.writer();
 
-    const message = try createQuery(allocator, "lambda.cx", @intToEnum(QType, @enumToInt(Type.A)));
+    const message = try createQuery(allocator, "lambda.cx", .@"*");
     defer message.deinit();
 
     var message_bytes = std.ArrayList(u8).init(allocator);
@@ -766,6 +766,7 @@ pub const ResourceData = union(enum) {
     txt: TXT,
     a: A,
     wks: WKS,
+    unknown: Unknown,
 
     pub fn to_writer(self: *const ResourceData, writer: anytype) !void {
         switch (self.*) {
@@ -775,23 +776,23 @@ pub const ResourceData = union(enum) {
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype, resource_type: Type, size: u16) !ResourceData {
         return switch (resource_type) {
-            .CNAME => ResourceData{ .cname   = try CNAME.from_reader(allocator, reader, size) },
-            .HINFO => ResourceData{ .hinfo   = try HINFO.from_reader(allocator, reader, size) },
-            .MB    => ResourceData{ .mb      = try    MB.from_reader(allocator, reader, size) },
-            .MD    => ResourceData{ .md      = try    MD.from_reader(allocator, reader, size) },
-            .MF    => ResourceData{ .mf      = try    MF.from_reader(allocator, reader, size) },
-            .MG    => ResourceData{ .mg      = try    MG.from_reader(allocator, reader, size) },
-            .MINFO => ResourceData{ .minfo   = try MINFO.from_reader(allocator, reader, size) },
-            .MR    => ResourceData{ .mr      = try    MR.from_reader(allocator, reader, size) },
-            .MX    => ResourceData{ .mx      = try    MX.from_reader(allocator, reader, size) },
-            .NULL  => ResourceData{ .@"null" = try  NULL.from_reader(allocator, reader, size) },
-            .NS    => ResourceData{ .ns      = try    NS.from_reader(allocator, reader, size) },
-            .PTR   => ResourceData{ .ptr     = try   PTR.from_reader(allocator, reader, size) },
-            .SOA   => ResourceData{ .soa     = try   SOA.from_reader(allocator, reader, size) },
-            .TXT   => ResourceData{ .txt     = try   TXT.from_reader(allocator, reader, size) },
-            .A     => ResourceData{ .a       = try     A.from_reader(allocator, reader, size) },
-            .WKS   => ResourceData{ .wks     = try   WKS.from_reader(allocator, reader, size) },
-            else   => error.TypeNotSupported,
+            .CNAME => ResourceData{ .cname   = try   CNAME.from_reader(allocator, reader, size) },
+            .HINFO => ResourceData{ .hinfo   = try   HINFO.from_reader(allocator, reader, size) },
+            .MB    => ResourceData{ .mb      = try      MB.from_reader(allocator, reader, size) },
+            .MD    => ResourceData{ .md      = try      MD.from_reader(allocator, reader, size) },
+            .MF    => ResourceData{ .mf      = try      MF.from_reader(allocator, reader, size) },
+            .MG    => ResourceData{ .mg      = try      MG.from_reader(allocator, reader, size) },
+            .MINFO => ResourceData{ .minfo   = try   MINFO.from_reader(allocator, reader, size) },
+            .MR    => ResourceData{ .mr      = try      MR.from_reader(allocator, reader, size) },
+            .MX    => ResourceData{ .mx      = try      MX.from_reader(allocator, reader, size) },
+            .NULL  => ResourceData{ .@"null" = try    NULL.from_reader(allocator, reader, size) },
+            .NS    => ResourceData{ .ns      = try      NS.from_reader(allocator, reader, size) },
+            .PTR   => ResourceData{ .ptr     = try     PTR.from_reader(allocator, reader, size) },
+            .SOA   => ResourceData{ .soa     = try     SOA.from_reader(allocator, reader, size) },
+            .TXT   => ResourceData{ .txt     = try     TXT.from_reader(allocator, reader, size) },
+            .A     => ResourceData{ .a       = try       A.from_reader(allocator, reader, size) },
+            .WKS   => ResourceData{ .wks     = try     WKS.from_reader(allocator, reader, size) },
+            else   => ResourceData{ .unknown = try Unknown.from_reader(allocator, reader, size) },
         };
     }
 
@@ -1219,6 +1220,32 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const WKS) void {
             self.allocator.free(self.bit_map);
+        }
+    };
+
+    pub const Unknown = struct {
+        allocator: mem.Allocator,
+        data: []const u8,
+
+        pub fn to_writer(self: *const Unknown, writer: anytype) !void {
+            try writer.writeAll(self.data);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !Unknown {
+            var data = try allocator.alloc(u8, size);
+            errdefer allocator.free(data);
+            const len = try reader.readAll(data);
+            if (len < size) {
+                return error.EndOfStream;
+            }
+            return .{
+                .allocator = allocator,
+                .data = data,
+            };
+        }
+
+        pub fn deinit(self: *const Unknown) void {
+            self.allocator.free(self.data);
         }
     };
 };
