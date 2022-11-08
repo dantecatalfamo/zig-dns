@@ -418,7 +418,11 @@ pub const ResourceRecord = struct {
         const class = @intToEnum(Class, try reader.readIntBig(u16));
         const ttl = try reader.readIntBig(i32);
         const resource_data_length = try reader.readIntBig(u16);
-        const resource_data = try ResourceData.from_reader(allocator, reader, resource_type, resource_data_length);
+        var counting_reader = io.countingReader(reader);
+        const resource_data = try ResourceData.from_reader(allocator, counting_reader.reader(), resource_type, resource_data_length);
+        if (counting_reader.bytes_read != resource_data_length) {
+            return error.ResourceDataSizeMismatch;
+        }
 
         return .{
             .name = name,
