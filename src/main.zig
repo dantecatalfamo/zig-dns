@@ -1535,12 +1535,12 @@ pub const ResourceData = union(enum) {
         /// size field, in thousandths of a second of arc. 2^31
         /// represents the equator; numbers above that are north
         /// latitude.
-        latitude: i32,
+        latitude: u32,
         /// The longitude of the center of the sphere described by the
         /// size field, in thousandths of a second of arc, rounded
         /// away from the prime meridian. 2^31 represents the prime
         /// meridian; numbers above that are east longitude.
-        longitude: i32,
+        longitude: u32,
         /// The altitude of the center of the sphere described by the
         /// size field, in centimeters, from a base of 100,000m below
         /// the [WGS 84] reference spheroid used by GPS (semimajor
@@ -1555,7 +1555,7 @@ pub const ResourceData = union(enum) {
         /// vertical precision will be necessary in most cases. The
         /// Defense Mapping Agency publishes geoid height values
         /// relative to the [WGS 84] ellipsoid.
-        altitude: i32,
+        altitude: u32,
 
         const PrecisionSize = packed struct (u8) {
             power: u4,
@@ -1581,9 +1581,9 @@ pub const ResourceData = union(enum) {
             try writer.writeByte(@bitCast(u8, self.size));
             try writer.writeByte(@bitCast(u8, self.horizontal_precision));
             try writer.writeByte(@bitCast(u8, self.vertical_precision));
-            try writer.writeIntBig(i32, self.latitude);
-            try writer.writeIntBig(i32, self.longitude);
-            try writer.writeIntBig(i32, self.altitude);
+            try writer.writeIntBig(u32, self.latitude);
+            try writer.writeIntBig(u32, self.longitude);
+            try writer.writeIntBig(u32, self.altitude);
         }
 
         pub fn from_reader(_: mem.Allocator, reader: anytype, _: u16) !LOC {
@@ -1591,9 +1591,9 @@ pub const ResourceData = union(enum) {
             const size = @bitCast(PrecisionSize, try reader.readByte());
             const horizontal_precision = @bitCast(PrecisionSize, try reader.readByte());
             const vertical_prevision = @bitCast(PrecisionSize, try reader.readByte());
-            const latitude = try reader.readIntBig(i32);
-            const longitude = try reader.readIntBig(i32);
-            const altitude = try reader.readIntBig(i32);
+            const latitude = try reader.readIntBig(u32);
+            const longitude = try reader.readIntBig(u32);
+            const altitude = try reader.readIntBig(u32);
 
             return .{
                 .version = version,
