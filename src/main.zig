@@ -853,15 +853,32 @@ pub const ResourceData = union(enum) {
         os:  []const u8,
 
         pub fn to_writer(self: *const HINFO, writer: anytype) !void {
+            if (self.cpu.len > 255) {
+                return error.CpuStringTooLong;
+            }
+            if (self.os.len > 255) {
+                return error.OsStringTooLong;
+            }
+            try writer.writeByte(@intCast(u8, self.cpu.len));
             try writer.writeAll(self.cpu);
-            try writer.writeByte(0);
+            try writer.writeByte(@intCast(u8, self.os.len));
             try writer.writeAll(self.os);
-            try writer.writeByte(0);
         }
 
-        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !HINFO {
-            const cpu = try reader.readUntilDelimiterAlloc(allocator, 0, size);
-            const os = try reader.readUntilDelimiterAlloc(allocator, 0, size - cpu.len);
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !HINFO {
+            const cpu = try allocator.alloc(u8, try reader.readByte());
+            errdefer allocator.free(cpu);
+            const cpu_len = try reader.readAll(cpu);
+            if (cpu_len < cpu.len) {
+                return error.EndOfStream;
+            }
+            const os = try allocator.alloc(u8, try reader.readByte());
+            errdefer allocator.free(os);
+            const os_len = try reader.readAll(os);
+            if (os_len < os.len) {
+                return error.EndOfStream;
+            }
+
             return .{
                 .allocator = allocator,
                 .cpu = cpu,
@@ -1156,27 +1173,48 @@ pub const ResourceData = union(enum) {
     pub const TXT = struct {
         allocator: mem.Allocator,
         /// One or more strings.
-        txt_data: []const u8,
+        txt_data: [][]const u8,
 
         pub fn to_writer(self: *const TXT, writer: anytype) !void {
-            try writer.writeAll(self.txt_data);
-            try writer.writeByte(0);
+            for (self.txt_data) |txt| {
+                if (txt.len > 255) {
+                    return error.TxtTooLong;
+                }
+                try writer.writeByte(@intCast(u8, txt.len));
+                try writer.writeAll(txt);
+            }
         }
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !TXT {
-            var txt = try allocator.alloc(u8, size);
-            errdefer allocator.free(txt);
-            const len = try reader.readAll(txt);
-            if (len < size) {
-                return error.EndOfStream;
+            var txt_data = StrList.init(allocator);
+
+            errdefer {
+                for (txt_data.items) |txt| {
+                    allocator.free(txt);
+                }
+                txt_data.deinit();
+            }
+
+            var bytes_read: usize = 0;
+            while (bytes_read < size) {
+                var txt = try allocator.alloc(u8, try reader.readByte());
+                const txt_len = try reader.readAll(txt);
+                if (txt_len < txt.len) {
+                    return error.EndOfStream;
+                }
+                try txt_data.append(txt);
+                bytes_read += txt_len + 1;
             }
             return .{
                 .allocator = allocator,
-                .txt_data = txt,
+                .txt_data = txt_data.toOwnedSlice(),
             };
         }
 
         pub fn deinit(self: *const TXT) void {
+            for (self.txt_data) |txt| {
+                self.allocator.free(txt);
+            }
             self.allocator.free(self.txt_data);
         }
     };
