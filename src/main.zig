@@ -1464,8 +1464,17 @@ pub const ResourceData = union(enum) {
 
     pub const URI = struct {
         allocator: mem.Allocator,
+        /// The priority of this target host. A client MUST attempt to
+        /// contact the target host with the lowest-numbered priority
+        /// it can reach
         priority: u16,
+        /// A relative weight for entries with the same priority.
+        /// Larger weights SHOULD be given a proportionately higher
+        /// probability of being selected.
         weight: u16,
+        /// This field holds the URI of the target, enclosed in
+        /// double-quote characters ('"'), where the URI is as
+        /// specified in RFC 3986.
         target: []const u8,
 
         pub fn to_writer(self: *const URI, writer: anytype) !void {
