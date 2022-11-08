@@ -1,3 +1,6 @@
+// Copyright (c) 2022 Dante Catalfamo
+// SPDX-License-Identifier: MIT
+
 const std = @import("std");
 const mem = std.mem;
 const io = std.io;
