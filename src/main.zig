@@ -484,6 +484,8 @@ pub const Type = enum (u16) {
     MX = 15,
     /// Text strings
     TXT = 16,
+    /// Responsible Person
+    RP = 17,
 
     _,
 };
@@ -769,6 +771,7 @@ pub const ResourceData = union(enum) {
     txt: TXT,
     a: A,
     wks: WKS,
+    rp: RP,
     unknown: Unknown,
 
     pub fn to_writer(self: *const ResourceData, writer: anytype) !void {
@@ -795,6 +798,7 @@ pub const ResourceData = union(enum) {
             .TXT   => ResourceData{ .txt     = try     TXT.from_reader(allocator, reader, size) },
             .A     => ResourceData{ .a       = try       A.from_reader(allocator, reader, size) },
             .WKS   => ResourceData{ .wks     = try     WKS.from_reader(allocator, reader, size) },
+            .RP    => ResourceData{ .rp      = try      RP.from_reader(allocator, reader, size) },
             else   => ResourceData{ .unknown = try Unknown.from_reader(allocator, reader, size) },
         };
     }
@@ -1249,6 +1253,42 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const Unknown) void {
             self.allocator.free(self.data);
+        }
+    };
+
+    pub const RP = struct {
+        allocator: mem.Allocator,
+        /// A domain name that specifies the mailbox for the
+        /// responsible person
+        mbox_dname: DomainName,
+        /// A domain name for which TXT RR's exist. A subsequent query
+        /// can be performed to retrieve the associated TXT resource
+        /// records at txt_dname.
+        txt_dname: []const u8,
+
+        pub fn to_writer(self: *const RP, writer: anytype) !void {
+            try self.mbox_dname.to_writer(writer);
+            try writer.writeAll(self.txt_dname);
+        }
+
+        pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !RP {
+            var counting_reader = io.countingReader(reader);
+            const mbox = try DomainName.from_reader(allocator, counting_reader.reader());
+            const txt = try allocator.alloc(u8, size - @intCast(u16, counting_reader.bytes_read));
+            const txt_length = try reader.readAll(txt);
+            if (txt_length + counting_reader.bytes_read < size) {
+                return error.EndOfStream;
+            }
+            return .{
+                .allocator = allocator,
+                .mbox_dname = mbox,
+                .txt_dname = txt,
+            };
+        }
+
+        pub fn deinit(self: *const RP) void {
+            self.allocator.free(self.txt_dname);
+            self.mbox_dname.deinit();
         }
     };
 };
