@@ -1517,12 +1517,12 @@ pub const ResourceData = union(enum) {
         version: u8,
         /// The diameter of a sphere enclosing the described entity,
         /// in centimeters.
-        size: TinyInt,
+        size: PrecisionSize,
         /// The horizontal precision of the data, in centimeters.
         /// This is the diameter of the horizontal "circle of error",
         /// rather than a "plus or minus" value. To get a "plus or
         /// minus" value, divide by 2.
-        horizontal_precision: TinyInt,
+        horizontal_precision: PrecisionSize,
         /// The vertical precision of the data, in centimeters.
         /// This is the total potential vertical error, rather than a
         /// "plus or minus" value. To get a "plus or minus" value,
@@ -1530,7 +1530,7 @@ pub const ResourceData = union(enum) {
         /// level is used as an approximation for altitude relative to
         /// the [WGS 84] ellipsoid, the precision value should be
         /// adjusted.
-        vertical_precision: TinyInt,
+        vertical_precision: PrecisionSize,
         /// The latitude of the center of the sphere described by the
         /// size field, in thousandths of a second of arc. 2^31
         /// represents the equator; numbers above that are north
@@ -1557,11 +1557,11 @@ pub const ResourceData = union(enum) {
         /// relative to the [WGS 84] ellipsoid.
         altitude: i32,
 
-        const TinyInt = packed struct (u8) {
+        const PrecisionSize = packed struct (u8) {
             power: u4,
             base: u4,
 
-            pub fn from_int(n: u32) TinyInt {
+            pub fn from_int(n: u32) PrecisionSize {
                 const power = std.math.log10(n);
                 const base = n / std.math.pow(u32, 10, power);
 
@@ -1571,7 +1571,7 @@ pub const ResourceData = union(enum) {
                 };
             }
 
-            pub fn to_int(self: *const TinyInt) u32 {
+            pub fn to_int(self: *const PrecisionSize) u32 {
                 return self.base * (std.math.pow(u32, 10, self.power));
             }
         };
@@ -1588,9 +1588,9 @@ pub const ResourceData = union(enum) {
 
         pub fn from_reader(_: mem.Allocator, reader: anytype, _: u16) !LOC {
             const version = try reader.readByte();
-            const size = @bitCast(TinyInt, try reader.readByte());
-            const horizontal_precision = @bitCast(TinyInt, try reader.readByte());
-            const vertical_prevision = @bitCast(TinyInt, try reader.readByte());
+            const size = @bitCast(PrecisionSize, try reader.readByte());
+            const horizontal_precision = @bitCast(PrecisionSize, try reader.readByte());
+            const vertical_prevision = @bitCast(PrecisionSize, try reader.readByte());
             const latitude = try reader.readIntBig(i32);
             const longitude = try reader.readIntBig(i32);
             const altitude = try reader.readIntBig(i32);
