@@ -1652,7 +1652,7 @@ pub const ResourceData = union(enum) {
             };
         }
 
-        /// Relative to sea level / WGS 84
+        /// Relative to sea level / WGS 84, in centimeters
         pub fn getAltitude(self: *const LOC) i32 {
             return reference_altitude - @intCast(i32, self.altitude);
         }
