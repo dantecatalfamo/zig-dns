@@ -1596,10 +1596,6 @@ pub const ResourceData = union(enum) {
                 South,
                 West,
             };
-
-            pub fn fromLatitude(lat: u32) LongLat {
-
-            }
         };
 
         pub const reference_altitude = 100_000 * 100;
@@ -1622,9 +1618,9 @@ pub const ResourceData = union(enum) {
             const degrees = latitude;
 
             return .{
-                .degrees = degrees,
-                .minutes = minutes,
-                .seconds = seconds,
+                .degrees = @intCast(u8, degrees),
+                .minutes = @intCast(u8, minutes),
+                .seconds = @intCast(u8, seconds),
                 .fraction_seconds = fraction_seconds,
                 .direction = direction,
             };
@@ -1648,15 +1644,18 @@ pub const ResourceData = union(enum) {
             const degrees = longitude;
 
             return .{
-                .degrees = degrees,
-                .minutes = minutes,
-                .seconds = seconds,
+                .degrees = @intCast(u8, degrees),
+                .minutes = @intCast(u8, minutes),
+                .seconds = @intCast(u8, seconds),
                 .fraction_seconds = fraction_seconds,
                 .direction = direction,
             };
         }
 
-        pub fn getAltitude(self: *const LOC)
+        /// Relative to sea level / WGS 84
+        pub fn getAltitude(self: *const LOC) i32 {
+            return reference_altitude - @intCast(i32, self.altitude);
+        }
 
         pub fn to_writer(self: *const LOC, writer: anytype) !void {
             try writer.writeByte(self.version);
