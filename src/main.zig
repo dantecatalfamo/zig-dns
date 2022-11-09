@@ -1513,16 +1513,20 @@ pub const ResourceData = union(enum) {
     };
 
     pub const LOC = struct {
-        /// Version number of the representation.  This must be zero.
-        version: u8,
+        /// Version number of the representation. This must be zero.
+        version: u8 = 0,
         /// The diameter of a sphere enclosing the described entity,
         /// in centimeters.
-        size: PrecisionSize,
+        ///
+        /// Default = 1m
+        size: PrecisionSize = .{ .base = 1, .power = 2 },
         /// The horizontal precision of the data, in centimeters.
         /// This is the diameter of the horizontal "circle of error",
         /// rather than a "plus or minus" value. To get a "plus or
         /// minus" value, divide by 2.
-        horizontal_precision: PrecisionSize,
+        ///
+        /// Default = 10km
+        horizontal_precision: PrecisionSize = .{ .base = 1, .power = 6 },
         /// The vertical precision of the data, in centimeters.
         /// This is the total potential vertical error, rather than a
         /// "plus or minus" value. To get a "plus or minus" value,
@@ -1530,7 +1534,9 @@ pub const ResourceData = union(enum) {
         /// level is used as an approximation for altitude relative to
         /// the [WGS 84] ellipsoid, the precision value should be
         /// adjusted.
-        vertical_precision: PrecisionSize,
+        ///
+        /// Default = 10m
+        vertical_precision: PrecisionSize = .{ .base = 1, .power = 3 },
         /// The latitude of the center of the sphere described by the
         /// size field, in thousandths of a second of arc. 2^31
         /// represents the equator; numbers above that are north
@@ -1557,7 +1563,8 @@ pub const ResourceData = union(enum) {
         /// relative to the [WGS 84] ellipsoid.
         altitude: u32,
 
-        const PrecisionSize = packed struct (u8) {
+        pub const PrecisionSize = packed struct (u8) {
+            /// The power of ten by which to multiply the base.
             power: u4,
             base: u4,
 
@@ -1575,6 +1582,81 @@ pub const ResourceData = union(enum) {
                 return self.base * (std.math.pow(u32, 10, self.power));
             }
         };
+
+        pub const LatLong = struct {
+            degrees: u8,
+            minutes: u8,
+            seconds: u8,
+            fraction_seconds: u32,
+            direction: Direction,
+
+            const Direction = enum {
+                North,
+                East,
+                South,
+                West,
+            };
+
+            pub fn fromLatitude(lat: u32) LongLat {
+
+            }
+        };
+
+        pub const reference_altitude = 100_000 * 100;
+
+        pub fn getLatitude(self: *const LOC) LatLong {
+            var latitude = self.latitude - (1 << 31);
+            var direction: LatLong.Direction = undefined;
+            if (latitude < 0) {
+                latitude = -latitude;
+                direction = .South;
+            } else {
+                direction = .North;
+            }
+            const fraction_seconds = latitude % 1000;
+            latitude /= 1000;
+            const seconds = latitude % 60;
+            latitude /= 60;
+            const minutes = latitude % 60;
+            latitude /= 60;
+            const degrees = latitude;
+
+            return .{
+                .degrees = degrees,
+                .minutes = minutes,
+                .seconds = seconds,
+                .fraction_seconds = fraction_seconds,
+                .direction = direction,
+            };
+        }
+
+        pub fn getLongitude(self: *const LOC) LatLong {
+            var longitude = self.longitude - (1 << 31);
+            var direction: LatLong.Direction = undefined;
+            if (longitude < 0) {
+                longitude = -longitude;
+                direction = .East;
+            } else {
+                direction = .West;
+            }
+            const fraction_seconds = longitude % 1000;
+            longitude /= 1000;
+            const seconds = longitude % 60;
+            longitude /= 60;
+            const minutes = longitude % 60;
+            longitude /= 60;
+            const degrees = longitude;
+
+            return .{
+                .degrees = degrees,
+                .minutes = minutes,
+                .seconds = seconds,
+                .fraction_seconds = fraction_seconds,
+                .direction = direction,
+            };
+        }
+
+        pub fn getAltitude(self: *const LOC)
 
         pub fn to_writer(self: *const LOC, writer: anytype) !void {
             try writer.writeByte(self.version);
