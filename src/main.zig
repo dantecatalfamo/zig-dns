@@ -1258,6 +1258,14 @@ pub const ResourceData = union(enum) {
             }
             self.allocator.free(self.txt_data);
         }
+
+        pub fn format(self: *const TXT, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+            _ = fmt;
+            _ = options;
+            for (self.txt_data) |txt| {
+                try writer.print("\"{s}\"", .{ txt });
+            }
+        }
     };
 
     pub const A = struct {
