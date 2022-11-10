@@ -516,6 +516,12 @@ pub const Type = enum (u16) {
     URI = 256,
 
     _,
+
+    pub fn format(self: Type, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt;
+        _ = options;
+        try formatTagName(self, writer);
+    }
 };
 
 pub const QTypeOnly = enum (u16) {
@@ -533,6 +539,7 @@ pub const QTypeOnly = enum (u16) {
 pub const QType = blk: {
     var info = @typeInfo(Type);
     info.Enum.fields = info.Enum.fields ++ @typeInfo(QTypeOnly).Enum.fields;
+    info.Enum.decls = &.{};
     break :blk @Type(info);
 };
 
@@ -546,6 +553,12 @@ pub const Class = enum (u16) {
     CH = 3,
     /// Hesiod [Dyer 87]
     HS = 4,
+
+    pub fn format(self: Class, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt;
+        _ = options;
+        try formatTagName(self, writer);
+    }
 };
 
 pub const QClassOnly = enum (u16) {
@@ -557,6 +570,7 @@ pub const QClassOnly = enum (u16) {
 pub const QClass = blk: {
     var info = @typeInfo(Class);
     info.Enum.fields = info.Enum.fields ++ @typeInfo(QClassOnly).Enum.fields;
+    info.Enum.decls = &.{};
     break :blk @Type(info);
 };
 
@@ -1765,6 +1779,17 @@ fn listDeinit(list: anytype) void {
         item.deinit();
     }
     list.deinit();
+}
+
+
+fn formatTagName(value: anytype, writer: anytype) !void {
+    inline for (comptime std.enums.values(@TypeOf(value))) |val| {
+        if (value == val) {
+            try writer.print("{s}", .{ @tagName(value) });
+            return;
+        }
+    }
+    try writer.print("{d}", .{ @enumToInt(value) });
 }
 
 test "ref all decls" {
