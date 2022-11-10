@@ -1411,6 +1411,29 @@ pub const ResourceData = union(enum) {
         }
 
         pub fn deinit(_: *const AAAA) void {}
+
+        pub fn format(self: *const AAAA, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+            _ = fmt;
+            _ = options;
+            try writer.print("{x:0>2}{x:0>2}:{x:0>2}{x:0>2}:{x:0>2}{x:0>2}:{x:0>2}{x:0>2}:{x:0>2}{x:0>2}:{x:0>2}{x:0>2}:{x:0>2}{x:0>2}:{x:0>2}{x:0>2}", .{
+                self.address[0],
+                self.address[1],
+                self.address[2],
+                self.address[3],
+                self.address[4],
+                self.address[5],
+                self.address[6],
+                self.address[7],
+                self.address[8],
+                self.address[9],
+                self.address[10],
+                self.address[11],
+                self.address[12],
+                self.address[13],
+                self.address[14],
+                self.address[15],
+            });
+        }
     };
 
     pub const SRV = struct {
