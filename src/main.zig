@@ -328,13 +328,13 @@ pub const Header = packed struct (u96) {
         try writer.print("Header {{\n", .{});
         try writer.print("  ID: {d}\n", .{ self.id });
         try writer.print("  Response: {}\n", .{ self.response });
-        try writer.print("  OpCode: {}\n", .{ self.opcode });
+        try writer.print("  OpCode: {s}\n", .{ @tagName(self.opcode) });
         try writer.print("  Authoritative Answer: {}\n", .{ self.authoritative_answer });
         try writer.print("  Truncation: {}\n", .{ self.truncation });
         try writer.print("  Recursion Desired: {}\n", .{ self.recursion_desired });
         try writer.print("  Recursion Available: {}\n", .{ self.recursion_available });
         try writer.print("  Z: {d}\n", .{ self.z });
-        try writer.print("  Response Code: {}\n", .{ self.response_code });
+        try writer.print("  Response Code: {s}\n", .{ @tagName(self.response_code) });
         try writer.print("}}\n", .{});
     }
 };
@@ -459,8 +459,8 @@ pub const ResourceRecord = struct {
 
         try writer.print("Resource Record {{\n", .{});
         try writer.print("  Name: {}\n", .{ self.name });
-        try writer.print("  Type: {}\n", .{ self.@"type" });
-        try writer.print("  Class: {}\n", .{ self.class });
+        try writer.print("  Type: {s}\n", .{ @tagName(self.@"type") });
+        try writer.print("  Class: {s}\n", .{ @tagName(self.class) });
         try writer.print("  TTL: {d}\n", .{ self.ttl });
         try writer.print("  Resource Data Length: {d}\n", .{ self.resource_data_length });
         try writer.print("  Resource Data: {}\n", .{ self.resource_data });
@@ -855,6 +855,15 @@ pub const ResourceData = union(enum) {
             inline else => |record| record.deinit(),
         }
     }
+
+    pub fn format(self: *const ResourceData, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt;
+        _ = options;
+        switch (self.*) {
+            inline else => |resource| try writer.print("{}", .{ resource }),
+        }
+    }
+
 
     pub const CNAME = struct {
         /// A domain name which specifies the canonical or primary name
@@ -1271,6 +1280,12 @@ pub const ResourceData = union(enum) {
         }
 
         pub fn deinit(_: *const A) void {}
+
+        pub fn format(self: *const A, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+            _ = fmt;
+            _ = options;
+            try writer.print("{d}.{d}.{d}.{d}", .{ self.address[0], self.address[1], self.address[2], self.address[3] });
+        }
     };
 
     pub const WKS = struct {
