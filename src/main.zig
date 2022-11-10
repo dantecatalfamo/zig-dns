@@ -23,7 +23,7 @@ pub fn main() anyerror!void {
     defer sock.close();
     const writer = sock.writer();
 
-    const message = try createQuery(allocator, "lambda.cx", @intToEnum(QType, @enumToInt(Type.A)));
+    const message = try createQuery(allocator, "lambda.cx", .A);
     defer message.deinit();
 
     var message_bytes = std.ArrayList(u8).init(allocator);
@@ -383,8 +383,8 @@ pub const Question = struct {
 
         try writer.print("Question {{\n", .{});
         try writer.print("  Name: {}\n", .{ self.qname });
-        try writer.print("  QType: {}\n", .{ self.qtype });
-        try writer.print("  QClass: {}\n", .{ self.qclass });
+        try writer.print("  QType: {s}\n", .{ @tagName(self.qtype) });
+        try writer.print("  QClass: {s}\n", .{ @tagName(self.qclass) });
         try writer.print("}}\n", .{});
     }
 };
@@ -504,8 +504,7 @@ pub const Type = enum (u16) {
     _,
 };
 
-/// QTYPES are a superset of TYPEs, hence all TYPEs are valid QTYPEs.
-pub const QType = enum (u16) {
+const QTypeOnly = enum (u16) {
     /// A request for a transfer of an entire zone
     AXFR = 252,
     /// A request for mailbox-related records (MB, MG or MR)
@@ -514,8 +513,13 @@ pub const QType = enum (u16) {
     MAILA = 254,
     /// A request for all records
     @"*" = 255,
+};
 
-    _,
+/// QTYPES are a superset of TYPEs, hence all TYPEs are valid QTYPEs.
+pub const QType = blk: {
+    var info = @typeInfo(Type);
+    info.Enum.fields = info.Enum.fields ++ @typeInfo(QTypeOnly).Enum.fields;
+    break :blk @Type(info);
 };
 
 /// DNS Resource Record Classes
@@ -530,12 +534,16 @@ pub const Class = enum (u16) {
     HS = 4,
 };
 
-/// QCLASS values are a superset of CLASS values; every CLASS is a valid QCLASS.
-pub const QClass = enum (u16) {
+const QClassOnly = enum (u16) {
     /// Any Class
     @"*" = 255,
+};
 
-    _,
+/// QCLASS values are a superset of CLASS values; every CLASS is a valid QCLASS.
+pub const QClass = blk: {
+    var info = @typeInfo(Class);
+    info.Enum.fields = info.Enum.fields ++ @typeInfo(QClassOnly).Enum.fields;
+    break :blk @Type(info);
 };
 
 /// A domain name represented as a sequence of labels, where each
