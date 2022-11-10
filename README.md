@@ -10,6 +10,14 @@ So far implements [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035.html) plus s
   * Generate DNS packets
   * Print packet contents
   
+### Interactive
+
+For testing and development purposes you can call the library interactively from the command line.
+
+```
+Usage: zig-dns <dns-server> <domain> <query-type>
+```
+
 ### Example
 
 ```zig
