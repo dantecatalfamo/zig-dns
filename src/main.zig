@@ -14,7 +14,7 @@ const QuestionList = std.ArrayList(Question);
 const ResourceRecordList = std.ArrayList(ResourceRecord);
 
 pub fn usage() noreturn {
-    std.debug.print("Usage: dns-zig <dns-server> <domain> <query-type>\n", .{});
+    std.debug.print("Usage: zig-dns <dns-server> <domain> <query-type>\n", .{});
     std.os.exit(1);
 }
 
