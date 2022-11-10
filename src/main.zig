@@ -459,8 +459,8 @@ pub const ResourceRecord = struct {
 
         try writer.print("Resource Record {{\n", .{});
         try writer.print("  Name: {}\n", .{ self.name });
-        try writer.print("  Type: {s}\n", .{ @tagName(self.@"type") });
-        try writer.print("  Class: {s}\n", .{ @tagName(self.class) });
+        try writer.print("  Type: {}\n", .{ self.@"type" });
+        try writer.print("  Class: {}\n", .{ self.class });
         try writer.print("  TTL: {d}\n", .{ self.ttl });
         try writer.print("  Resource Data Length: {d}\n", .{ self.resource_data_length });
         try writer.print("  Resource Data: {}\n", .{ self.resource_data });
