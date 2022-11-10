@@ -2,7 +2,7 @@
 
 Experimental DNS library implemented in zig.
 
-So far only implements [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035.html) and a handful of extra features.
+So far implements [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035.html) plus some updates.
 
 ### Features
   * Streaming interface
