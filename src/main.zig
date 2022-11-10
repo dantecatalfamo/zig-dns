@@ -616,7 +616,7 @@ pub const DomainName = struct {
                 .compressed => {
                     const header = @bitCast(Label.TextHeader, header_byte);
                     const pointer_end = try reader.readByte();
-                    // XXX Probably wrong
+                    // XXX Different on big-endian systems?
                     const components = Label.PointerComponents{ .upper = header.length, .lower = pointer_end };
                     const pointer = @bitCast(Label.Pointer, components);
                     const label = Label{
