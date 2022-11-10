@@ -13,17 +13,31 @@ const LabelList = std.ArrayList(DomainName.Label);
 const QuestionList = std.ArrayList(Question);
 const ResourceRecordList = std.ArrayList(ResourceRecord);
 
+pub fn usage() noreturn {
+    std.debug.print("Usage: dns-zig <dns-server> <domain> <query-type>\n", .{});
+    std.os.exit(1);
+}
+
 pub fn main() anyerror!void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     var allocator = gpa.allocator();
     try network.init();
     defer network.deinit();
-    const sock = try network.connectToHost(allocator, "8.8.8.8", 53, .udp);
+
+    var args = try std.process.argsWithAllocator(allocator);
+    defer args.deinit();
+
+    _ = args.next();
+    const dns_server = args.next() orelse usage();
+    const domain = args.next() orelse usage();
+    const query_type = args.next() orelse usage();
+
+    const sock = try network.connectToHost(allocator, dns_server, 53, .udp);
     defer sock.close();
     const writer = sock.writer();
 
-    const message = try createQuery(allocator, "lambda.cx", .A);
+    const message = try createQuery(allocator, domain, std.meta.stringToEnum(QType, query_type) orelse usage());
     defer message.deinit();
 
     var message_bytes = std.ArrayList(u8).init(allocator);
@@ -504,7 +518,7 @@ pub const Type = enum (u16) {
     _,
 };
 
-const QTypeOnly = enum (u16) {
+pub const QTypeOnly = enum (u16) {
     /// A request for a transfer of an entire zone
     AXFR = 252,
     /// A request for mailbox-related records (MB, MG or MR)
@@ -534,7 +548,7 @@ pub const Class = enum (u16) {
     HS = 4,
 };
 
-const QClassOnly = enum (u16) {
+pub const QClassOnly = enum (u16) {
     /// Any Class
     @"*" = 255,
 };
