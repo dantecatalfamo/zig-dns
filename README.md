@@ -80,3 +80,28 @@ Resource Record {
 }
 }
 ```
+
+### Currently supported record types
+
+* A - A host address
+* NS - An authoritative name server
+* MD - A mail destination (Obsolete)
+* MF - A mail forwarder (Obsolete)
+* CNAME - The canonical name for an alias
+* SOA - Marks the start of a zone of authority
+* MB - A mailbox domain name (Experimental)
+* MG - A mail group member (Experimental)
+* MR - A mail rename domain name (Experimental)
+* NULL - A byte array (Experimental)
+* WKS - A well known service description
+* PTR - A domain name pointer
+* HINFO - Host information
+* MINFO - Mailbox or mail list information
+* MX - Mail exchange
+* TXT - Text strings
+* RP - Responsible Person
+* AAAA - An IPv6 host address
+* LOC - Location information
+* SRV - Service locator
+* SSHFP - SSH Fingerprint
+* URI - Uniform Resource Identifier
