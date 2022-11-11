@@ -37,17 +37,13 @@ const writer = sock.writer();
 const message = try dns.createQuery(allocator, "lambda.cx", .A);
 defer message.deinit();
 
-var message_bytes = std.ArrayList(u8).init(allocator);
-defer message_bytes.deinit();
-
-try message.to_writer(message_bytes.writer());
-try writer.writeAll(message_bytes.items);
+var message_bytes = try message.to_bytes();
+try writer.writeAll(message_bytes);
 
 var recv = [_]u8{0} ** 1024;
 const recv_size = try sock.receive(&recv);
 
-var recv_buffer = std.io.fixedBufferStream(recv[0..recv_size]);
-const response = try Message.from_reader(allocator, recv_buffer.reader());
+const response = try Message.from_bytes(recv[0..recv_size]);
 defer response.deinit();
 
 std.debug.print("Response: {any}\n", .{ response });
