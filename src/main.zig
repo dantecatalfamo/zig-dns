@@ -49,11 +49,16 @@ pub fn main() anyerror!void {
     try writer.writeAll(message_bytes);
     var recv = [_]u8{0} ** 1024;
     const recv_size = try sock.receive(&recv);
+    const response_bytes = recv[0..recv_size];
 
-    std.debug.print("Recv: {any}\n", .{ recv[0..recv_size] });
-    const response = try Message.from_bytes(allocator, recv[0..recv_size]);
+    std.debug.print("Recv: {any}\n", .{ response_bytes });
+    const response = try Message.from_bytes(allocator, response_bytes);
     defer response.deinit();
-    std.debug.print("Response: {any}\n", .{ response });
+    std.debug.print("Response:\n{any}\n", .{ response });
+
+    const decompressed = try response.decompress(allocator, response_bytes);
+    defer decompressed.deinit();
+    std.debug.print("Decompressed:\n{any}\n", .{ decompressed });
 }
 
 pub fn createQuery(allocator: mem.Allocator, address: []const u8, qtype: QType) !Message {
@@ -218,6 +223,54 @@ pub const Message = struct {
             try writer.print("{any}", .{ addition });
         }
         try writer.print("}}\n", .{});
+    }
+
+    /// Creates a deep copy of the original message, with all message
+    /// pointers resolved
+    pub fn decompress(self: *const Message, allocator: mem.Allocator, packet: []const u8) !Message {
+        var questions = QuestionList.init(allocator);
+        errdefer listDeinit(questions);
+        var answers = ResourceRecordList.init(allocator);
+        errdefer listDeinit(answers);
+        var authorities = ResourceRecordList.init(allocator);
+        errdefer listDeinit(authorities);
+        var additional = ResourceRecordList.init(allocator);
+        errdefer listDeinit(additional);
+
+        for (self.questions) |question| {
+            const new_question = try question.decompress(allocator, packet);
+            errdefer new_question.deinit();
+            try questions.append(new_question);
+        }
+
+        for (self.answers) |answer| {
+            const new_answer = try answer.decompress(allocator, packet);
+            errdefer new_answer.deinit();
+            try answers.append(new_answer);
+        }
+
+        for (self.authorities) |authority| {
+            const new_authority = try authority.decompress(allocator, packet);
+            errdefer new_authority.deinit();
+            try authorities.append(new_authority);
+        }
+
+        for (self.additional) |addition| {
+            const new_addition = try addition.decompress(allocator, packet);
+            errdefer new_addition.deinit();
+            try additional.append(new_addition);
+        }
+
+        const message = Message{
+            .allocator = self.allocator,
+            .header = self.header,
+            .questions = questions.toOwnedSlice(),
+            .answers = answers.toOwnedSlice(),
+            .authorities = authorities.toOwnedSlice(),
+            .additional = additional.toOwnedSlice(),
+        };
+
+        return message;
     }
 };
 
@@ -413,6 +466,14 @@ pub const Question = struct {
         try writer.print("  QClass: {s}\n", .{ @tagName(self.qclass) });
         try writer.print("}}\n", .{});
     }
+
+    pub fn decompress(self: *const Question, allocator: mem.Allocator, packet: []const u8) !Question {
+        return Question{
+            .qname = try self.qname.decompress(allocator, packet),
+            .qtype = self.qtype,
+            .qclass = self.qclass,
+        };
+    }
 };
 
 pub const ResourceRecord = struct {
@@ -477,6 +538,19 @@ pub const ResourceRecord = struct {
         try writer.print("  Resource Data Length: {d}\n", .{ self.resource_data_length });
         try writer.print("  Resource Data: {}\n", .{ self.resource_data });
         try writer.print("}}\n", .{});
+    }
+
+    pub fn decompress(self: *const ResourceRecord, allocator: mem.Allocator, packet: []const u8) !ResourceRecord {
+        const new_record = try self.resource_data.decompress(allocator, packet);
+        return ResourceRecord{
+            .name = try self.name.decompress(allocator, packet),
+            .@"type" = self.@"type",
+            .class = self.class,
+            .ttl = self.ttl,
+            // XXX Should update?
+            .resource_data_length = self.resource_data_length,
+            .resource_data = new_record,
+        };
     }
 };
 
@@ -779,7 +853,11 @@ pub const DomainName = struct {
 
         errdefer {
             for (labels.items) |label| {
-                allocator.free(label);
+                switch (label) {
+                    .text => |text| allocator.free(text),
+                    .compressed => {},
+                }
+
             }
             labels.deinit();
         }
@@ -939,6 +1017,35 @@ pub const ResourceData = union(enum) {
         };
     }
 
+    pub fn decompress(self: ResourceData, allocator: mem.Allocator, packet: []const u8) !ResourceData {
+        return switch (self) {
+            .cname   => |inner| ResourceData{ .cname   = try inner.decompress(allocator, packet), },
+            .hinfo   => |inner| ResourceData{ .hinfo   = try inner.decompress(allocator, packet), },
+            .mb      => |inner| ResourceData{ .mb      = try inner.decompress(allocator, packet), },
+            .md      => |inner| ResourceData{ .md      = try inner.decompress(allocator, packet), },
+            .mf      => |inner| ResourceData{ .mf      = try inner.decompress(allocator, packet), },
+            .mg      => |inner| ResourceData{ .mg      = try inner.decompress(allocator, packet), },
+            .minfo   => |inner| ResourceData{ .minfo   = try inner.decompress(allocator, packet), },
+            .mr      => |inner| ResourceData{ .mr      = try inner.decompress(allocator, packet), },
+            .mx      => |inner| ResourceData{ .mx      = try inner.decompress(allocator, packet), },
+            .@"null" => |inner| ResourceData{ .@"null" = try inner.decompress(allocator, packet), },
+            .ns      => |inner| ResourceData{ .ns      = try inner.decompress(allocator, packet), },
+            .ptr     => |inner| ResourceData{ .ptr     = try inner.decompress(allocator, packet), },
+            .soa     => |inner| ResourceData{ .soa     = try inner.decompress(allocator, packet), },
+            .txt     => |inner| ResourceData{ .txt     = try inner.decompress(allocator, packet), },
+            .a       => |inner| ResourceData{ .a       = try inner.decompress(allocator, packet), },
+            .wks     => |inner| ResourceData{ .wks     = try inner.decompress(allocator, packet), },
+            .rp      => |inner| ResourceData{ .rp      = try inner.decompress(allocator, packet), },
+            .aaaa    => |inner| ResourceData{ .aaaa    = try inner.decompress(allocator, packet), },
+            .loc     => |inner| ResourceData{ .loc     = try inner.decompress(allocator, packet), },
+            .srv     => |inner| ResourceData{ .srv     = try inner.decompress(allocator, packet), },
+            .sshfp   => |inner| ResourceData{ .sshfp   = try inner.decompress(allocator, packet), },
+            .unknown => |inner| ResourceData{ .unknown = try inner.decompress(allocator, packet), },
+            else     => error.Decompress,
+        };
+
+    }
+
     pub fn deinit(self: *const ResourceData) void {
         switch (self.*) {
             inline else => |record| record.deinit(),
@@ -971,6 +1078,12 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const CNAME) void {
             self.cname.deinit();
+        }
+
+        pub fn decompress(self: CNAME, allocator: mem.Allocator, packet: []const u8) !CNAME {
+            return .{
+                .cname = try self.cname.decompress(allocator, packet),
+            };
         }
     };
 
@@ -1019,6 +1132,17 @@ pub const ResourceData = union(enum) {
             self.allocator.free(self.cpu);
             self.allocator.free(self.os);
         }
+
+        pub fn decompress(self: HINFO, allocator: mem.Allocator, _: []const u8) !HINFO {
+            const cpu = try allocator.dupe(u8, self.cpu);
+            errdefer allocator.free(cpu);
+            const os = try allocator.dupe(u8, self.os);
+            return .{
+                .allocator = allocator,
+                .cpu = cpu,
+                .os = os,
+            };
+        }
     };
 
     pub const MB = struct {
@@ -1038,6 +1162,12 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const MB) void {
             self.madname.deinit();
+        }
+
+        pub fn decompress(self: MB, allocator: mem.Allocator, packet: []const u8) !MB {
+            return .{
+                .madname = try self.madname.decompress(allocator, packet),
+            };
         }
     };
 
@@ -1060,6 +1190,12 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const MD) void {
             self.madname.deinit();
         }
+
+        pub fn decompress(self: MD, allocator: mem.Allocator, packet: []const u8) !MD {
+            return .{
+                .madname = try self.madname.decompress(allocator, packet),
+            };
+        }
     };
 
     pub const MF = struct {
@@ -1081,6 +1217,12 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const MF) void {
             self.madname.deinit();
         }
+
+        pub fn decompress(self: MF, allocator: mem.Allocator, packet: []const u8) !MF {
+            return .{
+                .madname = try self.madname.decompress(allocator, packet),
+            };
+        }
     };
 
     pub const MG = struct {
@@ -1100,6 +1242,12 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const MG) void {
             self.madname.deinit();
+        }
+
+        pub fn decompress(self: MG, allocator: mem.Allocator, packet: []const u8) !MG {
+            return .{
+                .madname = try self.madname.decompress(allocator, packet),
+            };
         }
     };
 
@@ -1135,6 +1283,16 @@ pub const ResourceData = union(enum) {
             self.rmailbx.deinit();
             self.emailbx.deinit();
         }
+
+        pub fn decompress(self: MINFO, allocator: mem.Allocator, packet: []const u8) !MINFO {
+            const rmailbx = try self.rmailbx.decompress(allocator, packet);
+            errdefer rmailbx.deinit();
+            const emailbx = try self.emailbx.decompress(allocator, packet);
+            return .{
+                .rmailbx = rmailbx,
+                .emailbx = emailbx,
+            };
+        }
     };
 
     pub const MR = struct {
@@ -1154,6 +1312,12 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const MR) void {
             self.madname.deinit();
+        }
+
+        pub fn decompress(self: MR, allocator: mem.Allocator, packet: []const u8) !MR {
+            return .{
+                .madname = try self.madname.decompress(allocator, packet),
+            };
         }
     };
 
@@ -1179,6 +1343,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const MX) void {
             self.exchange.deinit();
+        }
+
+        pub fn decompress(self: MX, allocator: mem.Allocator, packet: []const u8) !MX {
+            return .{
+                .preference = self.preference,
+                .exchange = try self.exchange.decompress(allocator, packet),
+            };
         }
     };
 
@@ -1206,6 +1377,13 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const NULL) void {
             self.allocator.free(self.data);
         }
+
+        pub fn decompress(self: NULL, allocator: mem.Allocator, _: []const u8) !NULL {
+            return .{
+                .allocator = allocator,
+                .data = try allocator.dupe(u8, self.data),
+            };
+        }
     };
 
     pub const NS = struct {
@@ -1226,6 +1404,12 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const NS) void {
             self.nsdname.deinit();
         }
+
+        pub fn decompress(self: NS, allocator: mem.Allocator, packet: []const u8) !NS {
+            return .{
+                .nsdname = try self.nsdname.decompress(allocator, packet),
+            };
+        }
     };
 
     pub const PTR = struct {
@@ -1245,6 +1429,12 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const PTR) void {
             self.ptrdname.deinit();
+        }
+
+        pub fn decompress(self: PTR, allocator: mem.Allocator, packet: []const u8) !PTR {
+            return .{
+                .ptrdname = try self.ptrdname.decompress(allocator, packet),
+            };
         }
     };
 
@@ -1297,6 +1487,21 @@ pub const ResourceData = union(enum) {
             self.mname.deinit();
             self.rname.deinit();
         }
+
+        pub fn decompress(self: SOA, allocator: mem.Allocator, packet: []const u8) !SOA {
+            const mname = try self.mname.decompress(allocator, packet);
+            const rname = try self.rname.decompress(allocator, packet);
+            return .{
+                .mname = mname,
+                .rname = rname,
+                .serial = self.serial,
+                .refresh = self.refresh,
+                .retry = self.retry,
+                .expire = self.expire,
+                .minimum = self.minimum,
+            };
+        }
+
     };
 
     pub const TXT = struct {
@@ -1355,6 +1560,25 @@ pub const ResourceData = union(enum) {
                 try writer.print("\"{s}\"", .{ txt });
             }
         }
+
+        pub fn decompress(self: TXT, allocator: mem.Allocator, _: []const u8) !TXT {
+            var str_list = StrList.init(allocator);
+
+            errdefer {
+                for (str_list.items) |txt| {
+                    allocator.free(txt);
+                }
+                str_list.deinit();
+            }
+
+            for (self.txt_data) |txt| {
+                try str_list.append(try allocator.dupe(u8, txt));
+            }
+            return .{
+                .allocator = allocator,
+                .txt_data = str_list.toOwnedSlice(),
+            };
+        }
     };
 
     pub const A = struct {
@@ -1383,6 +1607,11 @@ pub const ResourceData = union(enum) {
             _ = options;
             try writer.print("{d}.{d}.{d}.{d}", .{ self.address[0], self.address[1], self.address[2], self.address[3] });
         }
+
+        pub fn decompress(self: A, _: mem.Allocator, _: []const u8) !A {
+            return self;
+        }
+
     };
 
     pub const WKS = struct {
@@ -1424,6 +1653,16 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const WKS) void {
             self.allocator.free(self.bit_map);
         }
+
+        pub fn decompress(self: WKS, allocator: mem.Allocator, _: []const u8) !WKS {
+            return .{
+                .allocator = allocator,
+                .address = self.address,
+                .protocol = self.protocol,
+                .bit_map = try allocator.dupe(u8, self.bit_map),
+            };
+        }
+
     };
 
     pub const Unknown = struct {
@@ -1449,6 +1688,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const Unknown) void {
             self.allocator.free(self.data);
+        }
+
+        pub fn decompress(self: Unknown, allocator: mem.Allocator, _: []const u8) !Unknown {
+            return .{
+                .allocator = allocator,
+                .data = try allocator.dupe(u8, self.data),
+            };
         }
     };
 
@@ -1486,6 +1732,17 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const RP) void {
             self.allocator.free(self.txt_dname);
             self.mbox_dname.deinit();
+        }
+
+        pub fn decompress(self: RP, allocator: mem.Allocator, packet: []const u8) !RP {
+            const mbox_dname = try self.mbox_dname.decompress(allocator, packet);
+            errdefer mbox_dname.deinit();
+            const txt_dname = try allocator.dupe(u8, self.txt_dname);
+            return .{
+                .allocator = allocator,
+                .mbox_dname = mbox_dname,
+                .txt_dname = txt_dname,
+            };
         }
     };
 
@@ -1531,6 +1788,10 @@ pub const ResourceData = union(enum) {
                 self.address[15],
             });
         }
+
+        pub fn decompress(self: AAAA, _: mem.Allocator, _: []const u8) !AAAA {
+            return self;
+        }
     };
 
     pub const SRV = struct {
@@ -1571,6 +1832,16 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const SRV) void {
             self.target.deinit();
         }
+
+        pub fn decompress(self: SRV, allocator: mem.Allocator, packet: []const u8) !SRV {
+            return .{
+                .priority = self.priority,
+                .weight = self.weight,
+                .port = self.port,
+                .target = try self.target.decompress(allocator, packet),
+            };
+        }
+
     };
 
     pub const SSHFP = struct {
@@ -1623,6 +1894,16 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const SSHFP) void {
             self.allocator.free(self.fingerprint);
         }
+
+        pub fn decompress(self: SSHFP, allocator: mem.Allocator, _: []const u8) !SSHFP {
+            return .{
+                .allocator = allocator,
+                .algorithm = self.algorithm,
+                .fingerprint_type = self.fingerprint_type,
+                .fingerprint = try allocator.dupe(u8, self.fingerprint),
+            };
+        }
+
     };
 
     pub const URI = struct {
@@ -1666,6 +1947,15 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const URI) void {
             self.allocator.free(self.target);
+        }
+
+        pub fn decompress(self: URI, allocator: mem.Allocator, _: []const u8) !URI {
+            return .{
+                .allocator = allocator,
+                .priority = self.priority,
+                .weight = self.weight,
+                .target = try allocator.dupe(u8, self.target),
+            };
         }
     };
 
@@ -1845,6 +2135,10 @@ pub const ResourceData = union(enum) {
         }
 
         pub fn deinit(_: *const LOC) void {}
+
+        pub fn decompress(self: LOC, _: mem.Allocator, _: []const u8) !LOC {
+            return self;
+        }
     };
 };
 
