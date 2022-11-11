@@ -52,7 +52,8 @@ std.debug.print("Response: {any}\n", .{ response });
 Output:
 
 ```
-Response: Message {
+Response:
+Message {
 Header {
   ID: 1
   Response: true
@@ -62,7 +63,7 @@ Header {
   Recursion Desired: true
   Recursion Available: true
   Z: 0
-  Response no_error
+  Response Code: no_error
 }
 Question {
   Name: lambda.cx.
@@ -70,7 +71,7 @@ Question {
   QClass: IN
 }
 Resource Record {
-  Name: Pointer<12>
+  Name: lambda.cx.
   Type: A
   Class: IN
   TTL: 1800
