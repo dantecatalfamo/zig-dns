@@ -1928,6 +1928,20 @@ pub const ResourceData = union(enum) {
             self.target.deinit();
         }
 
+        pub fn format(self: *const SRV, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print(
+                \\SRV {{
+                \\    Priority: {d}
+                \\    Weight: {d}
+                \\    Port: {d}
+                \\    Target: {}
+                \\  }}
+                , .{ self.priority, self.weight, self.port, self.target });
+        }
+
         pub fn decompress(self: SRV, allocator: mem.Allocator, packet: []const u8) !SRV {
             return .{
                 .priority = self.priority,
@@ -1990,6 +2004,13 @@ pub const ResourceData = union(enum) {
             self.allocator.free(self.fingerprint);
         }
 
+        pub fn format(self: *const SSHFP, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("Algorithm: {s}, Fingerprint Type: {s}, Fingerprint: {s}", .{ @tagName(self.algorithm), @tagName(self.fingerprint_type), self.fingerprint });
+        }
+
         pub fn decompress(self: SSHFP, allocator: mem.Allocator, _: []const u8) !SSHFP {
             return .{
                 .allocator = allocator,
@@ -2042,6 +2063,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const URI) void {
             self.allocator.free(self.target);
+        }
+
+        pub fn format(self: *const URI, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("Priority: {d}, Weight: {d}, Target: {s}", .{ self.priority, self.weight, self.target });
         }
 
         pub fn decompress(self: URI, allocator: mem.Allocator, _: []const u8) !URI {
