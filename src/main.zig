@@ -761,6 +761,54 @@ pub const DomainName = struct {
         self.allocator.free(self.labels);
     }
 
+    /// Returns a completely newly allocated DomainName
+    pub fn decompress(self: *const DomainName, allocator: mem.Allocator, packet: []const u8) !DomainName {
+        var labels = LabelList.init(allocator);
+        var depth: usize = 0;
+        var pointer: ?Label.Pointer = null;
+        for (self.labels) |label| {
+            switch (label) {
+                .text => |text| {
+                    const duped = try allocator.dupe(u8, text);
+                    const new_label = Label{ .text = duped };
+                    try labels.append(new_label);
+                },
+                .compressed => |ptr| {
+                    pointer = ptr;
+                    break;
+                },
+            }
+        }
+
+        while (pointer) |valid_pointer| {
+            if (depth > max_compression_depth) {
+                return error.CompressionDepth;
+            }
+            var buffer = io.fixedBufferStream(packet);
+            var reader = buffer.reader();
+            buffer.pos = valid_pointer;
+            const domain = try DomainName.from_reader(allocator, reader);
+            pointer = null;
+            for (domain.labels) |label| {
+                switch (label) {
+                    .text => try labels.append(label),
+                    .compressed => |ptr| {
+                        pointer = ptr;
+                        depth += 1;
+                        break;
+                    },
+                }
+            }
+        }
+
+        return DomainName{
+            .allocator = allocator,
+            .labels = labels.toOwnedSlice(),
+        };
+    }
+
+    pub const max_compression_depth = 25;
+
     // TODO: Proper label compression
     pub const Label = union(enum) {
         text: []const u8,
