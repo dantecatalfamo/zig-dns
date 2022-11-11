@@ -1020,29 +1020,7 @@ pub const ResourceData = union(enum) {
 
     pub fn decompress(self: ResourceData, allocator: mem.Allocator, packet: []const u8) !ResourceData {
         return switch (self) {
-            .cname   => |inner| ResourceData{ .cname   = try inner.decompress(allocator, packet), },
-            .hinfo   => |inner| ResourceData{ .hinfo   = try inner.decompress(allocator, packet), },
-            .mb      => |inner| ResourceData{ .mb      = try inner.decompress(allocator, packet), },
-            .md      => |inner| ResourceData{ .md      = try inner.decompress(allocator, packet), },
-            .mf      => |inner| ResourceData{ .mf      = try inner.decompress(allocator, packet), },
-            .mg      => |inner| ResourceData{ .mg      = try inner.decompress(allocator, packet), },
-            .minfo   => |inner| ResourceData{ .minfo   = try inner.decompress(allocator, packet), },
-            .mr      => |inner| ResourceData{ .mr      = try inner.decompress(allocator, packet), },
-            .mx      => |inner| ResourceData{ .mx      = try inner.decompress(allocator, packet), },
-            .@"null" => |inner| ResourceData{ .@"null" = try inner.decompress(allocator, packet), },
-            .ns      => |inner| ResourceData{ .ns      = try inner.decompress(allocator, packet), },
-            .ptr     => |inner| ResourceData{ .ptr     = try inner.decompress(allocator, packet), },
-            .soa     => |inner| ResourceData{ .soa     = try inner.decompress(allocator, packet), },
-            .txt     => |inner| ResourceData{ .txt     = try inner.decompress(allocator, packet), },
-            .a       => |inner| ResourceData{ .a       = try inner.decompress(allocator, packet), },
-            .wks     => |inner| ResourceData{ .wks     = try inner.decompress(allocator, packet), },
-            .rp      => |inner| ResourceData{ .rp      = try inner.decompress(allocator, packet), },
-            .aaaa    => |inner| ResourceData{ .aaaa    = try inner.decompress(allocator, packet), },
-            .loc     => |inner| ResourceData{ .loc     = try inner.decompress(allocator, packet), },
-            .srv     => |inner| ResourceData{ .srv     = try inner.decompress(allocator, packet), },
-            .sshfp   => |inner| ResourceData{ .sshfp   = try inner.decompress(allocator, packet), },
-            .unknown => |inner| ResourceData{ .unknown = try inner.decompress(allocator, packet), },
-            else     => error.UnknownDecompression,
+            inline else => |inner, tag| @unionInit(ResourceData, @tagName(tag), try inner.decompress(allocator, packet)),
         };
     }
 
