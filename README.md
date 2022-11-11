@@ -9,6 +9,7 @@ So far implements [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035.html) plus s
   * Parse DNS packets
   * Generate DNS packets
   * Print packet contents
+  * Label compression
 
 ### Currently supported record types
 
