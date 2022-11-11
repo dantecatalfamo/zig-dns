@@ -4,6 +4,8 @@ Experimental DNS library implemented in zig.
 
 So far implements [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035.html) plus some updates.
 
+The library itself has no dependencies, the CLI example uses [`zig-network`](https://github.com/MasterQ32/zig-network) to send and receive packets over the network.
+
 * Library: `src/dns.zig`
 * CLI test: `src/main.zig`
 
