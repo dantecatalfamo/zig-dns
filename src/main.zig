@@ -1058,6 +1058,13 @@ pub const ResourceData = union(enum) {
             self.cname.deinit();
         }
 
+        pub fn format(self: *const CNAME, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{}", .{ self.cname });
+        }
+
         pub fn decompress(self: CNAME, allocator: mem.Allocator, packet: []const u8) !CNAME {
             return .{
                 .cname = try self.cname.decompress(allocator, packet),
@@ -1111,6 +1118,13 @@ pub const ResourceData = union(enum) {
             self.allocator.free(self.os);
         }
 
+        pub fn format(self: *const HINFO, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("CPU: \"{s}\", OS: \"{s}\"", .{ self.cpu, self.os });
+        }
+
         pub fn decompress(self: HINFO, allocator: mem.Allocator, _: []const u8) !HINFO {
             const cpu = try allocator.dupe(u8, self.cpu);
             errdefer allocator.free(cpu);
@@ -1142,6 +1156,13 @@ pub const ResourceData = union(enum) {
             self.madname.deinit();
         }
 
+        pub fn format(self: *const MB, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{}", .{ self.madname });
+        }
+
         pub fn decompress(self: MB, allocator: mem.Allocator, packet: []const u8) !MB {
             return .{
                 .madname = try self.madname.decompress(allocator, packet),
@@ -1167,6 +1188,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const MD) void {
             self.madname.deinit();
+        }
+
+        pub fn format(self: *const MD, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{}", .{ self.madname });
         }
 
         pub fn decompress(self: MD, allocator: mem.Allocator, packet: []const u8) !MD {
@@ -1196,6 +1224,13 @@ pub const ResourceData = union(enum) {
             self.madname.deinit();
         }
 
+        pub fn format(self: *const MF, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{}", .{ self.madname });
+        }
+
         pub fn decompress(self: MF, allocator: mem.Allocator, packet: []const u8) !MF {
             return .{
                 .madname = try self.madname.decompress(allocator, packet),
@@ -1220,6 +1255,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const MG) void {
             self.madname.deinit();
+        }
+
+        pub fn format(self: *const MG, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{}", .{ self.madname });
         }
 
         pub fn decompress(self: MG, allocator: mem.Allocator, packet: []const u8) !MG {
@@ -1262,6 +1304,13 @@ pub const ResourceData = union(enum) {
             self.emailbx.deinit();
         }
 
+        pub fn format(self: *const MINFO, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("rmailbox: {}, emailbox: {}", .{ self.rmailbx, self.emailbx });
+        }
+
         pub fn decompress(self: MINFO, allocator: mem.Allocator, packet: []const u8) !MINFO {
             const rmailbx = try self.rmailbx.decompress(allocator, packet);
             errdefer rmailbx.deinit();
@@ -1290,6 +1339,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const MR) void {
             self.madname.deinit();
+        }
+
+        pub fn format(self: *const MR, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{}", .{ self.madname });
         }
 
         pub fn decompress(self: MR, allocator: mem.Allocator, packet: []const u8) !MR {
@@ -1321,6 +1377,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const MX) void {
             self.exchange.deinit();
+        }
+
+        pub fn format(self: *const MX, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("Preference: {d}, Exchange: {}", .{ self.preference, self.exchange });
         }
 
         pub fn decompress(self: MX, allocator: mem.Allocator, packet: []const u8) !MX {
@@ -1356,6 +1419,13 @@ pub const ResourceData = union(enum) {
             self.allocator.free(self.data);
         }
 
+        pub fn format(self: *const NULL, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{s}", .{ std.fmt.fmtSliceHexUpper(self.data) });
+        }
+
         pub fn decompress(self: NULL, allocator: mem.Allocator, _: []const u8) !NULL {
             return .{
                 .allocator = allocator,
@@ -1383,6 +1453,13 @@ pub const ResourceData = union(enum) {
             self.nsdname.deinit();
         }
 
+        pub fn format(self: *const NS, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{}", .{ self.nsdname });
+        }
+
         pub fn decompress(self: NS, allocator: mem.Allocator, packet: []const u8) !NS {
             return .{
                 .nsdname = try self.nsdname.decompress(allocator, packet),
@@ -1407,6 +1484,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const PTR) void {
             self.ptrdname.deinit();
+        }
+
+        pub fn format(self: *const PTR, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{}", .{ self.ptrdname });
         }
 
         pub fn decompress(self: PTR, allocator: mem.Allocator, packet: []const u8) !PTR {
@@ -1464,6 +1548,23 @@ pub const ResourceData = union(enum) {
         pub fn deinit(self: *const SOA) void {
             self.mname.deinit();
             self.rname.deinit();
+        }
+
+        pub fn format(self: *const SOA, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print(
+                \\SOA {{
+                \\    Primary Nameserver: {}
+                \\    Responsible Person Mailbox: {}
+                \\    Version Serial: {d}
+                \\    Refresh: {d}
+                \\    Retry: {d}
+                \\    Expire: {d}
+                \\    Minumum: {d}
+                \\  }}
+                , .{ self.mname, self.rname, self.serial, self.refresh, self.retry, self.expire, self.minimum });
         }
 
         pub fn decompress(self: SOA, allocator: mem.Allocator, packet: []const u8) !SOA {
@@ -1632,6 +1733,15 @@ pub const ResourceData = union(enum) {
             self.allocator.free(self.bit_map);
         }
 
+        pub fn format(self: *const WKS, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("Address: {d}.{d}.{d}.{d}, Protocol: {d}, Bitmap: {s}",
+                             .{ self.address[0], self.address[1], self.address[2], self.address[3],
+                                self.protocol, std.fmt.fmtSliceEscapeUpper(self.bit_map) });
+        }
+
         pub fn decompress(self: WKS, allocator: mem.Allocator, _: []const u8) !WKS {
             return .{
                 .allocator = allocator,
@@ -1666,6 +1776,13 @@ pub const ResourceData = union(enum) {
 
         pub fn deinit(self: *const Unknown) void {
             self.allocator.free(self.data);
+        }
+
+        pub fn format(self: *const Unknown, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) !void {
+            _ = fmt;
+            _ = options;
+
+            try writer.print("{s}", .{ std.fmt.fmtSliceEscapeUpper(self.data) });
         }
 
         pub fn decompress(self: Unknown, allocator: mem.Allocator, _: []const u8) !Unknown {
