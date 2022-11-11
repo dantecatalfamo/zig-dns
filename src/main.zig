@@ -764,12 +764,21 @@ pub const DomainName = struct {
     /// Returns a completely newly allocated DomainName
     pub fn decompress(self: *const DomainName, allocator: mem.Allocator, packet: []const u8) !DomainName {
         var labels = LabelList.init(allocator);
+
+        errdefer {
+            for (labels.items) |label| {
+                allocator.free(label);
+            }
+            labels.deinit();
+        }
+
         var depth: usize = 0;
         var pointer: ?Label.Pointer = null;
         for (self.labels) |label| {
             switch (label) {
                 .text => |text| {
                     const duped = try allocator.dupe(u8, text);
+                    errdefer allocator.free(duped);
                     const new_label = Label{ .text = duped };
                     try labels.append(new_label);
                 },
@@ -788,10 +797,16 @@ pub const DomainName = struct {
             var reader = buffer.reader();
             buffer.pos = valid_pointer;
             const domain = try DomainName.from_reader(allocator, reader);
+            defer domain.deinit();
             pointer = null;
             for (domain.labels) |label| {
                 switch (label) {
-                    .text => try labels.append(label),
+                    .text => |text| {
+                        const duped = try allocator.dupe(u8, text);
+                        errdefer allocator.free(duped);
+                        const new_label = Label{ .text = duped };
+                        try labels.append(new_label);
+                    },
                     .compressed => |ptr| {
                         pointer = ptr;
                         depth += 1;
