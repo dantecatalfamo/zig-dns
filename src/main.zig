@@ -55,10 +55,6 @@ pub fn main() anyerror!void {
     const response = try Message.from_bytes(allocator, response_bytes);
     defer response.deinit();
     std.debug.print("Response:\n{any}\n", .{ response });
-
-    const decompressed = try response.decompress(allocator, response_bytes);
-    defer decompressed.deinit();
-    std.debug.print("Decompressed:\n{any}\n", .{ decompressed });
 }
 
 pub fn createQuery(allocator: mem.Allocator, address: []const u8, qtype: QType) !Message {
@@ -124,6 +120,7 @@ pub const Message = struct {
         }
     }
 
+    /// Not decompressed
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Message {
         var header = try Header.from_reader(reader);
 
@@ -173,10 +170,14 @@ pub const Message = struct {
         };
     }
 
+    /// Automatically decompressed
     pub fn from_bytes(allocator: mem.Allocator, bytes: []const u8) !Message {
         var buffer = io.fixedBufferStream(bytes);
         var reader = buffer.reader();
-        return try Message.from_reader(allocator, reader);
+        const message = try Message.from_reader(allocator, reader);
+        defer message.deinit();
+        const decompressed = try message.decompress(allocator, bytes);
+        return decompressed;
     }
 
     pub fn to_bytes(self: *const Message, allocator: mem.Allocator) ![]const u8 {
@@ -1041,9 +1042,8 @@ pub const ResourceData = union(enum) {
             .srv     => |inner| ResourceData{ .srv     = try inner.decompress(allocator, packet), },
             .sshfp   => |inner| ResourceData{ .sshfp   = try inner.decompress(allocator, packet), },
             .unknown => |inner| ResourceData{ .unknown = try inner.decompress(allocator, packet), },
-            else     => error.Decompress,
+            else     => error.UnknownDecompression,
         };
-
     }
 
     pub fn deinit(self: *const ResourceData) void {
