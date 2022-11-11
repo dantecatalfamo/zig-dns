@@ -40,19 +40,18 @@ pub fn main() anyerror!void {
     const message = try createQuery(allocator, domain, std.meta.stringToEnum(QType, query_type) orelse usage());
     defer message.deinit();
 
-    var message_bytes = std.ArrayList(u8).init(allocator);
-    defer message_bytes.deinit();
+    var message_bytes = try message.to_bytes(allocator);
+    defer allocator.free(message_bytes);
 
-    try message.to_writer(message_bytes.writer());
-
-    std.debug.print("Sending bytes: {any}\n", .{ message_bytes.items });
+    std.debug.print("Sending bytes: {any}\n", .{ message_bytes });
     std.debug.print("Query: {}", .{ message });
-    try writer.writeAll(message_bytes.items);
+
+    try writer.writeAll(message_bytes);
     var recv = [_]u8{0} ** 1024;
     const recv_size = try sock.receive(&recv);
+
     std.debug.print("Recv: {any}\n", .{ recv[0..recv_size] });
-    var recv_buffer = std.io.fixedBufferStream(recv[0..recv_size]);
-    const response = try Message.from_reader(allocator, recv_buffer.reader());
+    const response = try Message.from_bytes(allocator, recv[0..recv_size]);
     defer response.deinit();
     std.debug.print("Response: {any}\n", .{ response });
 }
@@ -167,6 +166,19 @@ pub const Message = struct {
             .authorities = authorities.toOwnedSlice(),
             .additional = additional.toOwnedSlice(),
         };
+    }
+
+    pub fn from_bytes(allocator: mem.Allocator, bytes: []const u8) !Message {
+        var buffer = io.fixedBufferStream(bytes);
+        var reader = buffer.reader();
+        return try Message.from_reader(allocator, reader);
+    }
+
+    pub fn to_bytes(self: *const Message, allocator: mem.Allocator) ![]const u8 {
+        var bytes = std.ArrayList(u8).init(allocator);
+        var writer = bytes.writer();
+        try self.to_writer(writer);
+        return bytes.toOwnedSlice();
     }
 
     pub fn deinit(self: *const Message) void {
