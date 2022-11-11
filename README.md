@@ -4,6 +4,9 @@ Experimental DNS library implemented in zig.
 
 So far implements [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035.html) plus some updates.
 
+* Library: `src/dns.zig`
+* CLI test: `src/main.zig`
+
 ### Features
   * Streaming interface
   * Parse DNS packets
@@ -50,7 +53,7 @@ Usage: zig-dns <dns-server> <domain> <query-type>
 const std = @import("std");
 const io = std.io;
 const network = @import("network");
-const dns = @import("zig-dns/src/main.zig");
+const dns = @import("zig-dns/src/dns.zig");
 
 // [...] Main function, allocator, etc.
 
