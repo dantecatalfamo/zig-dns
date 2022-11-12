@@ -166,18 +166,26 @@ pub const Message = struct {
         _ = options;
         try writer.print("Message {{\n", .{});
         try writer.print("{any}", .{ self.header });
+        try writer.print("  Questions {{\n", .{});
         for (self.questions) |question| {
             try writer.print("{any}", .{ question });
         }
+        try writer.print("  }}\n", .{});
+        try writer.print("  Ansewrs {{\n", .{});
         for (self.answers) |answer| {
             try writer.print("{any}", .{ answer });
         }
+        try writer.print("  }}\n", .{});
+        try writer.print("  Authorities {{\n", .{});
         for (self.authorities) |authority| {
             try writer.print("{any}", .{ authority });
         }
+        try writer.print("  }}\n", .{});
+        try writer.print("  Additional {{\n", .{});
         for (self.additional) |addition| {
             try writer.print("{any}", .{ addition });
         }
+        try writer.print("  }}\n", .{});
         try writer.print("}}\n", .{});
     }
 
@@ -346,17 +354,17 @@ pub const Header = packed struct (u96) {
     pub fn format(self: *const Header, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
         _ = fmt;
         _ = options;
-        try writer.print("Header {{\n", .{});
-        try writer.print("  ID: {d}\n", .{ self.id });
-        try writer.print("  Response: {}\n", .{ self.response });
-        try writer.print("  OpCode: {s}\n", .{ @tagName(self.opcode) });
-        try writer.print("  Authoritative Answer: {}\n", .{ self.authoritative_answer });
-        try writer.print("  Truncation: {}\n", .{ self.truncation });
-        try writer.print("  Recursion Desired: {}\n", .{ self.recursion_desired });
-        try writer.print("  Recursion Available: {}\n", .{ self.recursion_available });
-        try writer.print("  Z: {d}\n", .{ self.z });
-        try writer.print("  Response Code: {s}\n", .{ @tagName(self.response_code) });
-        try writer.print("}}\n", .{});
+        try writer.print("  Header {{\n", .{});
+        try writer.print("    ID: {d}\n", .{ self.id });
+        try writer.print("    Response: {}\n", .{ self.response });
+        try writer.print("    OpCode: {s}\n", .{ @tagName(self.opcode) });
+        try writer.print("    Authoritative Answer: {}\n", .{ self.authoritative_answer });
+        try writer.print("    Truncation: {}\n", .{ self.truncation });
+        try writer.print("    Recursion Desired: {}\n", .{ self.recursion_desired });
+        try writer.print("    Recursion Available: {}\n", .{ self.recursion_available });
+        try writer.print("    Z: {d}\n", .{ self.z });
+        try writer.print("    Response Code: {s}\n", .{ @tagName(self.response_code) });
+        try writer.print("  }}\n", .{});
     }
 };
 
@@ -416,11 +424,11 @@ pub const Question = struct {
         _ = fmt;
         _ = options;
 
-        try writer.print("Question {{\n", .{});
-        try writer.print("  Name: {}\n", .{ self.qname });
-        try writer.print("  QType: {s}\n", .{ @tagName(self.qtype) });
-        try writer.print("  QClass: {s}\n", .{ @tagName(self.qclass) });
-        try writer.print("}}\n", .{});
+        try writer.print("    Question {{\n", .{});
+        try writer.print("      Name: {}\n", .{ self.qname });
+        try writer.print("      QType: {s}\n", .{ @tagName(self.qtype) });
+        try writer.print("      QClass: {s}\n", .{ @tagName(self.qclass) });
+        try writer.print("    }}\n", .{});
     }
 
     pub fn decompress(self: *const Question, allocator: mem.Allocator, packet: []const u8) !Question {
@@ -486,14 +494,14 @@ pub const ResourceRecord = struct {
         _ = fmt;
         _ = options;
 
-        try writer.print("Resource Record {{\n", .{});
-        try writer.print("  Name: {}\n", .{ self.name });
-        try writer.print("  Type: {}\n", .{ self.@"type" });
-        try writer.print("  Class: {}\n", .{ self.class });
-        try writer.print("  TTL: {d}\n", .{ self.ttl });
-        try writer.print("  Resource Data Length: {d}\n", .{ self.resource_data_length });
-        try writer.print("  Resource Data: {}\n", .{ self.resource_data });
-        try writer.print("}}\n", .{});
+        try writer.print("    Resource Record {{\n", .{});
+        try writer.print("      Name: {}\n", .{ self.name });
+        try writer.print("      Type: {}\n", .{ self.@"type" });
+        try writer.print("      Class: {}\n", .{ self.class });
+        try writer.print("      TTL: {d}\n", .{ self.ttl });
+        try writer.print("      Resource Data Length: {d}\n", .{ self.resource_data_length });
+        try writer.print("      Resource Data: {}\n", .{ self.resource_data });
+        try writer.print("    }}\n", .{});
     }
 
     pub fn decompress(self: *const ResourceRecord, allocator: mem.Allocator, packet: []const u8) !ResourceRecord {
@@ -1511,14 +1519,14 @@ pub const ResourceData = union(enum) {
 
             try writer.print(
                 \\SOA {{
-                \\    Primary Nameserver: {}
-                \\    Responsible Person Mailbox: {}
-                \\    Version Serial: {d}
-                \\    Refresh: {d}
-                \\    Retry: {d}
-                \\    Expire: {d}
-                \\    Minumum: {d}
-                \\  }}
+                \\        Primary Nameserver: {}
+                \\        Responsible Person Mailbox: {}
+                \\        Version Serial: {d}
+                \\        Refresh: {d}
+                \\        Retry: {d}
+                \\        Expire: {d}
+                \\        Minumum: {d}
+                \\      }}
                 , .{ self.mname, self.rname, self.serial, self.refresh, self.retry, self.expire, self.minimum });
         }
 
@@ -1889,11 +1897,11 @@ pub const ResourceData = union(enum) {
 
             try writer.print(
                 \\SRV {{
-                \\    Priority: {d}
-                \\    Weight: {d}
-                \\    Port: {d}
-                \\    Target: {}
-                \\  }}
+                \\        Priority: {d}
+                \\        Weight: {d}
+                \\        Port: {d}
+                \\        Target: {}
+                \\      }}
                 , .{ self.priority, self.weight, self.port, self.target });
         }
 
