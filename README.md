@@ -155,7 +155,7 @@ const recv_size = try sock.receive(&recv);
 const response = try Message.from_bytes(recv[0..recv_size]);
 defer response.deinit();
 
-std.debug.print("Response: {any}\n", .{ response });
+std.debug.print("Response:\n{any}\n", .{ response });
 ```
 
 Output:
@@ -163,29 +163,45 @@ Output:
 ```
 Response:
 Message {
-Header {
-  ID: 1
-  Response: true
-  OpCode: query
-  Authoritative Answer: false
-  Truncation: false
-  Recursion Desired: true
-  Recursion Available: true
-  Z: 0
-  Response Code: no_error
-}
-Question {
-  Name: lambda.cx.
-  QType: A
-  QClass: IN
-}
-Resource Record {
-  Name: lambda.cx.
-  Type: A
-  Class: IN
-  TTL: 1800
-  Resource Data Length: 4
-  Resource Data: 155.138.137.134
-}
+  Header {
+    ID: 1
+    Response: true
+    OpCode: query
+    Authoritative Answer: false
+    Truncation: false
+    Recursion Desired: true
+    Recursion Available: true
+    Z: 0
+    Response Code: no_error
+  }
+  Questions {
+    Question {
+      Name: www.lambda.cx.
+      QType: A
+      QClass: IN
+    }
+  }
+  Ansewrs {
+    Resource Record {
+      Name: www.lambda.cx.
+      Type: CNAME
+      Class: IN
+      TTL: 1800
+      Resource Data Length: 2
+      Resource Data: lambda.cx.
+    }
+    Resource Record {
+      Name: lambda.cx.
+      Type: A
+      Class: IN
+      TTL: 1800
+      Resource Data Length: 4
+      Resource Data: 155.138.137.134
+    }
+  }
+  Authorities {
+  }
+  Additional {
+  }
 }
 ```
