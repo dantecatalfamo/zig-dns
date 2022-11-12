@@ -38,7 +38,7 @@ The library itself has no dependencies, the CLI example uses [`zig-network`](htt
 * AAAA - An IPv6 host address [RFC 3596](https://www.rfc-editor.org/rfc/rfc3596)
 * LOC - Location information [RFC 1876](https://datatracker.ietf.org/doc/html/rfc1876)
 * SRV - Service locator [RFC 2782](https://www.rfc-editor.org/rfc/rfc2782)
-* SSHFP - SSH Fingerprint [RFC 4255](https://www.rfc-editor.org/rfc/rfc4255) [RFC 6594](https://www.rfc-editor.org/rfc/rfc6594)
+* SSHFP - SSH Fingerprint [RFC 4255](https://www.rfc-editor.org/rfc/rfc4255), [RFC 6594](https://www.rfc-editor.org/rfc/rfc6594)
 * URI - Uniform Resource Identifier [RFC 7553](https://www.rfc-editor.org/rfc/rfc7553.html)
   
 ### Interactive
