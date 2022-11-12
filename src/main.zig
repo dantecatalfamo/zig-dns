@@ -36,7 +36,7 @@ pub fn main() anyerror!void {
     defer allocator.free(message_bytes);
 
     std.debug.print("Sending bytes: {any}\n", .{ message_bytes });
-    std.debug.print("Query: {}", .{ message });
+    std.debug.print("Query:\n {}", .{ message });
 
     try writer.writeAll(message_bytes);
     var recv = [_]u8{0} ** 1024;

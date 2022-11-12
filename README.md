@@ -49,7 +49,85 @@ For testing and development purposes you can call the library interactively from
 Usage: zig-dns <dns-server> <domain> <query-type>
 ```
 
-### Example
+### Interactive Example
+
+```
+$ zig-dns 1.1.1.1 www.lambda.cx A
+Sending bytes: { 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 3, 119, 119, 119, 6, 108, 97, 109, 98, 100, 97, 2, 99, 120, 0, 0, 1, 0, 1 }
+Query:
+ Message {
+  Header {
+    ID: 1
+    Response: false
+    OpCode: query
+    Authoritative Answer: false
+    Truncation: false
+    Recursion Desired: true
+    Recursion Available: false
+    Z: 0
+    Response Code: no_error
+  }
+  Questions {
+    Question {
+      Name: www.lambda.cx.
+      QType: A
+      QClass: IN
+    }
+  }
+  Ansewrs {
+  }
+  Authorities {
+  }
+  Additional {
+  }
+}
+Recv: { 0, 1, 129, 128, 0, 1, 0, 2, 0, 0, 0, 0, 3, 119, 119, 119, 6, 108, 97, 109, 98, 100, 97, 2, 99, 120, 0, 0, 1, 0, 1, 192, 12, 0, 5, 0, 1, 0, 0, 7, 8, 0, 2, 192, 16, 192, 16, 0, 1, 0, 1, 0, 0, 7, 8, 0, 4, 155, 138, 137, 134 }
+Response:
+Message {
+  Header {
+    ID: 1
+    Response: true
+    OpCode: query
+    Authoritative Answer: false
+    Truncation: false
+    Recursion Desired: true
+    Recursion Available: true
+    Z: 0
+    Response Code: no_error
+  }
+  Questions {
+    Question {
+      Name: www.lambda.cx.
+      QType: A
+      QClass: IN
+    }
+  }
+  Ansewrs {
+    Resource Record {
+      Name: www.lambda.cx.
+      Type: CNAME
+      Class: IN
+      TTL: 1800
+      Resource Data Length: 2
+      Resource Data: lambda.cx.
+    }
+    Resource Record {
+      Name: lambda.cx.
+      Type: A
+      Class: IN
+      TTL: 1800
+      Resource Data Length: 4
+      Resource Data: 155.138.137.134
+    }
+  }
+  Authorities {
+  }
+  Additional {
+  }
+}
+```
+
+### Example Code
 
 ```zig
 const std = @import("std");
