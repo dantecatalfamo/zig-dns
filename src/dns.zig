@@ -588,7 +588,7 @@ pub const Type = enum (u16) {
     }
 };
 
-/// Types excluside to QType.
+/// Types exclusive to QType.
 pub const QTypeOnly = enum (u16) {
     /// A request for a transfer of an entire zone
     AXFR = 252,
@@ -626,7 +626,7 @@ pub const Class = enum (u16) {
     }
 };
 
-/// Classes excluside to QClass.
+/// Classes exclusive to QClass.
 pub const QClassOnly = enum (u16) {
     /// Any Class
     @"*" = 255,
