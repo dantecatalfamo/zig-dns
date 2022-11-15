@@ -12,6 +12,7 @@ const LabelList = std.ArrayList(DomainName.Label);
 const QuestionList = std.ArrayList(Question);
 const ResourceRecordList = std.ArrayList(ResourceRecord);
 
+/// Creates a DNS query message with common defaults.
 pub fn createQuery(allocator: mem.Allocator, address: []const u8, qtype: QType) !Message {
     const header = Header{
         .id = 1,
@@ -51,12 +52,21 @@ pub fn createQuery(allocator: mem.Allocator, address: []const u8, qtype: QType) 
     return message;
 }
 
+/// DNS Message. All communications inside of the domain protocol are
+/// carried in a single format called a message.
 pub const Message = struct {
     allocator: mem.Allocator,
+    /// Contains information about the message. The header section is
+    /// always present
     header: Header,
+    /// The question(s) being asked in the query. This section usually
+    /// contains one question.
     questions: []const Question,
+    /// ResourceRecords answering the question.
     answers: []const ResourceRecord,
+    /// ResourceRecords pointing toward an authority.
     authorities: []const ResourceRecord,
+    /// ResourceRecords holding additional information.
     additional: []const ResourceRecord,
 
     pub fn to_writer(self: *const Message, writer: anytype) !void {
@@ -238,6 +248,7 @@ pub const Message = struct {
     }
 };
 
+/// DNS message header. Contains information about the message.
 pub const Header = packed struct (u96) {
     /// An identifier assigned by the program that generates any kind
     /// of query. This identifier is copied the corresponding reply
@@ -393,6 +404,7 @@ test "Header.to_bytes reverses parse" {
     // try std.testing.expectEqual(header, header2);
 }
 
+/// Question being asked in the query.
 pub const Question = struct {
     qname: DomainName,
     qtype: QType,
@@ -440,6 +452,8 @@ pub const Question = struct {
     }
 };
 
+/// Shared by the answer, authority, and additional sections of the
+/// message.
 pub const ResourceRecord = struct {
     name: DomainName,
     @"type": Type,
@@ -574,6 +588,7 @@ pub const Type = enum (u16) {
     }
 };
 
+/// Types excluside to QType.
 pub const QTypeOnly = enum (u16) {
     /// A request for a transfer of an entire zone
     AXFR = 252,
@@ -611,6 +626,7 @@ pub const Class = enum (u16) {
     }
 };
 
+/// Classes excluside to QClass.
 pub const QClassOnly = enum (u16) {
     /// Any Class
     @"*" = 255,
@@ -923,6 +939,8 @@ test "DomainName" {
     // try testing.expectEqualSlices(u8, bytes, from_str_bytes);
 }
 
+/// The data section of a ResourceRecord. Different based on the
+/// record type.
 pub const ResourceData = union(enum) {
     cname: CNAME,
     hinfo: HINFO,
