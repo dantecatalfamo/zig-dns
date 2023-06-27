@@ -17,6 +17,12 @@ pub fn build(b: *std.build.Builder) void {
     exe.setBuildMode(mode);
     exe.install();
 
+    const iter = b.addExecutable("iterative", "src/iterative.zig");
+    iter.addPackagePath("network", "zig-network/network.zig");
+    iter.setTarget(target);
+    iter.setBuildMode(mode);
+    iter.install();
+
     const run_cmd = exe.run();
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
