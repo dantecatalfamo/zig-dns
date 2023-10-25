@@ -18,7 +18,10 @@ pub fn main() anyerror!void {
     defer args.deinit();
 
     _ = args.next();
-    const domain = args.next().?;
+    const domain = args.next() orelse {
+        std.debug.print("usage: iterative <domain>\n", .{});
+        std.os.exit(1);
+    };
     const qtype = std.meta.stringToEnum(dns.QType, args.next() orelse "A") orelse .A;
 
     std.debug.print("querying: {s}\n", .{root_server});
