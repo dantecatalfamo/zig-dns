@@ -128,10 +128,10 @@ pub const Message = struct {
         return Message{
             .allocator = allocator,
             .header = header,
-            .questions = questions.toOwnedSlice(),
-            .answers = answers.toOwnedSlice(),
-            .authorities = authorities.toOwnedSlice(),
-            .additional = additional.toOwnedSlice(),
+            .questions = try questions.toOwnedSlice(),
+            .answers = try answers.toOwnedSlice(),
+            .authorities = try authorities.toOwnedSlice(),
+            .additional = try additional.toOwnedSlice(),
         };
     }
 
@@ -238,10 +238,10 @@ pub const Message = struct {
         const message = Message{
             .allocator = self.allocator,
             .header = self.header,
-            .questions = questions.toOwnedSlice(),
-            .answers = answers.toOwnedSlice(),
-            .authorities = authorities.toOwnedSlice(),
-            .additional = additional.toOwnedSlice(),
+            .questions = try questions.toOwnedSlice(),
+            .answers = try answers.toOwnedSlice(),
+            .authorities = try authorities.toOwnedSlice(),
+            .additional = try additional.toOwnedSlice(),
         };
 
         return message;
@@ -707,7 +707,7 @@ pub const DomainName = struct {
 
         return DomainName{
             .allocator = allocator,
-            .labels = labels.toOwnedSlice(),
+            .labels = try labels.toOwnedSlice(),
         };
     }
 
@@ -769,7 +769,7 @@ pub const DomainName = struct {
         try labels.append(label);
         return DomainName{
             .allocator = allocator,
-            .labels = labels.toOwnedSlice(),
+            .labels = try labels.toOwnedSlice(),
         };
     }
 
@@ -792,7 +792,7 @@ pub const DomainName = struct {
                 },
             }
         }
-        return string.toOwnedSlice();
+        return try string.toOwnedSlice();
     }
 
     pub fn format(self: *const DomainName, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
@@ -884,7 +884,7 @@ pub const DomainName = struct {
 
         return DomainName{
             .allocator = allocator,
-            .labels = labels.toOwnedSlice(),
+            .labels = try labels.toOwnedSlice(),
         };
     }
 
@@ -1596,7 +1596,7 @@ pub const ResourceData = union(enum) {
             }
             return .{
                 .allocator = allocator,
-                .txt_data = txt_data.toOwnedSlice(),
+                .txt_data = try txt_data.toOwnedSlice(),
             };
         }
 
@@ -1630,7 +1630,7 @@ pub const ResourceData = union(enum) {
             }
             return .{
                 .allocator = allocator,
-                .txt_data = str_list.toOwnedSlice(),
+                .txt_data = try str_list.toOwnedSlice(),
             };
         }
     };
