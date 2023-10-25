@@ -205,3 +205,6 @@ Message {
   }
 }
 ```
+
+### Iterative Example
+See [iterative.zig](src/iterative.zig) as an example for how to use this library iteratively.
