@@ -21,7 +21,7 @@ pub fn main() anyerror!void {
     const domain = args.next().?;
     const qtype = std.meta.stringToEnum(dns.QType, args.next() orelse "A") orelse .A;
 
-    std.debug.print("querying: {s}\n", .{ root_server });
+    std.debug.print("querying: {s}\n", .{root_server});
     var query = try makeNonRecursiveQuery(allocator, root_server, domain, qtype);
 
     var resolved = false;
@@ -34,7 +34,7 @@ pub fn main() anyerror!void {
                     const ns = try query.authorities[0].resource_data.ns.nsdname.to_string(allocator);
                     defer allocator.free(ns);
                     query.deinit();
-                    std.debug.print("querying: {s}\n", .{ ns });
+                    std.debug.print("querying: {s}\n", .{ns});
                     query = try makeNonRecursiveQuery(allocator, ns, domain, qtype);
                 },
                 else => {
@@ -48,11 +48,10 @@ pub fn main() anyerror!void {
             query.deinit();
             return;
         }
-
     }
 
     for (query.answers) |answer| {
-        std.debug.print("{}\n", .{ answer.resource_data });
+        std.debug.print("{}\n", .{answer.resource_data});
     }
     query.deinit();
 }

@@ -35,7 +35,7 @@ pub fn createQuery(allocator: mem.Allocator, address: []const u8, qtype: QType) 
     const question = Question{
         .qname = domain,
         .qtype = qtype,
-        .qclass = @intToEnum(QClass, @enumToInt(Class.IN)),
+        .qclass = @enumFromInt(@intFromEnum(Class.IN)),
     };
     var questions = try allocator.alloc(Question, 1);
     questions[0] = question;
@@ -175,25 +175,25 @@ pub const Message = struct {
         _ = fmt;
         _ = options;
         try writer.print("Message {{\n", .{});
-        try writer.print("{any}", .{ self.header });
+        try writer.print("{any}", .{self.header});
         try writer.print("  Questions {{\n", .{});
         for (self.questions) |question| {
-            try writer.print("{any}", .{ question });
+            try writer.print("{any}", .{question});
         }
         try writer.print("  }}\n", .{});
         try writer.print("  Ansewrs {{\n", .{});
         for (self.answers) |answer| {
-            try writer.print("{any}", .{ answer });
+            try writer.print("{any}", .{answer});
         }
         try writer.print("  }}\n", .{});
         try writer.print("  Authorities {{\n", .{});
         for (self.authorities) |authority| {
-            try writer.print("{any}", .{ authority });
+            try writer.print("{any}", .{authority});
         }
         try writer.print("  }}\n", .{});
         try writer.print("  Additional {{\n", .{});
         for (self.additional) |addition| {
-            try writer.print("{any}", .{ addition });
+            try writer.print("{any}", .{addition});
         }
         try writer.print("  }}\n", .{});
         try writer.print("}}\n", .{});
@@ -249,7 +249,7 @@ pub const Message = struct {
 };
 
 /// DNS message header. Contains information about the message.
-pub const Header = packed struct (u96) {
+pub const Header = packed struct(u96) {
     /// An identifier assigned by the program that generates any kind
     /// of query. This identifier is copied the corresponding reply
     /// and can be used by the requester to match up replies to
@@ -332,7 +332,7 @@ pub const Header = packed struct (u96) {
         if (bytes_read < 12) {
             return error.NotEnoughBytes;
         }
-        var header = @bitCast(Header, bytes);
+        var header: Header = @bitCast(bytes);
         if (builtin.cpu.arch.endian() == .Big) {
             return header;
         }
@@ -347,14 +347,14 @@ pub const Header = packed struct (u96) {
     pub fn to_bytes(self: *const Header) [12]u8 {
         var header = self.*;
         if (builtin.cpu.arch.endian() == .Big) {
-            return @bitCast([12]u8, header);
+            return @bitCast(header);
         }
         header.id = @byteSwap(header.id);
         header.question_count = @byteSwap(header.question_count);
         header.answer_count = @byteSwap(header.answer_count);
         header.name_server_count = @byteSwap(header.name_server_count);
         header.additional_record_count = @byteSwap(header.additional_record_count);
-        return @bitCast([12]u8, header);
+        return @as([12]u8, @bitCast(header));
     }
 
     pub fn to_writer(self: *const Header, writer: anytype) !void {
@@ -366,15 +366,15 @@ pub const Header = packed struct (u96) {
         _ = fmt;
         _ = options;
         try writer.print("  Header {{\n", .{});
-        try writer.print("    ID: {d}\n", .{ self.id });
-        try writer.print("    Response: {}\n", .{ self.response });
-        try writer.print("    OpCode: {s}\n", .{ @tagName(self.opcode) });
-        try writer.print("    Authoritative Answer: {}\n", .{ self.authoritative_answer });
-        try writer.print("    Truncation: {}\n", .{ self.truncation });
-        try writer.print("    Recursion Desired: {}\n", .{ self.recursion_desired });
-        try writer.print("    Recursion Available: {}\n", .{ self.recursion_available });
-        try writer.print("    Z: {d}\n", .{ self.z });
-        try writer.print("    Response Code: {s}\n", .{ @tagName(self.response_code) });
+        try writer.print("    ID: {d}\n", .{self.id});
+        try writer.print("    Response: {}\n", .{self.response});
+        try writer.print("    OpCode: {s}\n", .{@tagName(self.opcode)});
+        try writer.print("    Authoritative Answer: {}\n", .{self.authoritative_answer});
+        try writer.print("    Truncation: {}\n", .{self.truncation});
+        try writer.print("    Recursion Desired: {}\n", .{self.recursion_desired});
+        try writer.print("    Recursion Available: {}\n", .{self.recursion_available});
+        try writer.print("    Z: {d}\n", .{self.z});
+        try writer.print("    Response Code: {s}\n", .{@tagName(self.response_code)});
         try writer.print("  }}\n", .{});
     }
 };
@@ -412,8 +412,8 @@ pub const Question = struct {
 
     pub fn to_writer(self: *const Question, writer: anytype) !void {
         try self.qname.to_writer(writer);
-        try writer.writeIntBig(u16, @enumToInt(self.qtype));
-        try writer.writeIntBig(u16, @enumToInt(self.qclass));
+        try writer.writeIntBig(u16, @intFromEnum(self.qtype));
+        try writer.writeIntBig(u16, @intFromEnum(self.qclass));
     }
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Question {
@@ -421,10 +421,10 @@ pub const Question = struct {
         var qtype = try reader.readIntBig(u16);
         var qclass = try reader.readIntBig(u16);
 
-        return  Question{
+        return Question{
             .qname = qname,
-            .qtype = @intToEnum(QType, qtype),
-            .qclass = @intToEnum(QClass, qclass),
+            .qtype = @enumFromInt(qtype),
+            .qclass = @enumFromInt(qclass),
         };
     }
 
@@ -437,9 +437,9 @@ pub const Question = struct {
         _ = options;
 
         try writer.print("    Question {{\n", .{});
-        try writer.print("      Name: {}\n", .{ self.qname });
-        try writer.print("      QType: {s}\n", .{ @tagName(self.qtype) });
-        try writer.print("      QClass: {s}\n", .{ @tagName(self.qclass) });
+        try writer.print("      Name: {}\n", .{self.qname});
+        try writer.print("      QType: {s}\n", .{@tagName(self.qtype)});
+        try writer.print("      QClass: {s}\n", .{@tagName(self.qclass)});
         try writer.print("    }}\n", .{});
     }
 
@@ -456,7 +456,7 @@ pub const Question = struct {
 /// message.
 pub const ResourceRecord = struct {
     name: DomainName,
-    @"type": Type,
+    type: Type,
     class: Class,
     ttl: i32,
     resource_data_length: u16,
@@ -469,18 +469,18 @@ pub const ResourceRecord = struct {
         try self.resource_data.to_writer(resource_data_stream.writer());
 
         try self.name.to_writer(writer);
-        try writer.writeIntBig(u16, @enumToInt(self.@"type"));
-        try writer.writeIntBig(u16, @enumToInt(self.class));
+        try writer.writeIntBig(u16, @intFromEnum(self.type));
+        try writer.writeIntBig(u16, @intFromEnum(self.class));
         try writer.writeIntBig(i32, self.ttl);
-        try writer.writeIntBig(u16, @intCast(u16, try resource_data_stream.getPos()));
+        try writer.writeIntBig(u16, @as(u16, @intCast(try resource_data_stream.getPos())));
         try writer.writeAll(resource_data_stream.getWritten());
     }
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !ResourceRecord {
         const name = try DomainName.from_reader(allocator, reader);
         errdefer name.deinit();
-        const resource_type = @intToEnum(Type, try reader.readIntBig(u16));
-        const class = @intToEnum(Class, try reader.readIntBig(u16));
+        const resource_type: Type = @enumFromInt(try reader.readIntBig(u16));
+        const class: Class = @enumFromInt(try reader.readIntBig(u16));
         const ttl = try reader.readIntBig(i32);
         const resource_data_length = try reader.readIntBig(u16);
         var counting_reader = io.countingReader(reader);
@@ -491,7 +491,7 @@ pub const ResourceRecord = struct {
 
         return .{
             .name = name,
-            .@"type" = resource_type,
+            .type = resource_type,
             .class = class,
             .ttl = ttl,
             .resource_data_length = resource_data_length,
@@ -509,12 +509,12 @@ pub const ResourceRecord = struct {
         _ = options;
 
         try writer.print("    Resource Record {{\n", .{});
-        try writer.print("      Name: {}\n", .{ self.name });
-        try writer.print("      Type: {}\n", .{ self.@"type" });
-        try writer.print("      Class: {}\n", .{ self.class });
-        try writer.print("      TTL: {d}\n", .{ self.ttl });
-        try writer.print("      Resource Data Length: {d}\n", .{ self.resource_data_length });
-        try writer.print("      Resource Data: {}\n", .{ self.resource_data });
+        try writer.print("      Name: {}\n", .{self.name});
+        try writer.print("      Type: {}\n", .{self.type});
+        try writer.print("      Class: {}\n", .{self.class});
+        try writer.print("      TTL: {d}\n", .{self.ttl});
+        try writer.print("      Resource Data Length: {d}\n", .{self.resource_data_length});
+        try writer.print("      Resource Data: {}\n", .{self.resource_data});
         try writer.print("    }}\n", .{});
     }
 
@@ -522,7 +522,7 @@ pub const ResourceRecord = struct {
         const new_record = try self.resource_data.decompress(allocator, packet);
         return ResourceRecord{
             .name = try self.name.decompress(allocator, packet),
-            .@"type" = self.@"type",
+            .type = self.type,
             .class = self.class,
             .ttl = self.ttl,
             // XXX Should update?
@@ -533,7 +533,7 @@ pub const ResourceRecord = struct {
 };
 
 /// DNS Resource Record types
-pub const Type = enum (u16) {
+pub const Type = enum(u16) {
     /// A host address
     A = 1,
     /// An authoritative name server
@@ -589,7 +589,7 @@ pub const Type = enum (u16) {
 };
 
 /// Types exclusive to QType.
-pub const QTypeOnly = enum (u16) {
+pub const QTypeOnly = enum(u16) {
     /// A request for a transfer of an entire zone
     AXFR = 252,
     /// A request for mailbox-related records (MB, MG or MR)
@@ -609,7 +609,7 @@ pub const QType = blk: {
 };
 
 /// DNS Resource Record Classes
-pub const Class = enum (u16) {
+pub const Class = enum(u16) {
     /// The Internet
     IN = 1,
     /// The CSNET class (Obsolete - used only for examples in some obsolete RFCs)
@@ -627,7 +627,7 @@ pub const Class = enum (u16) {
 };
 
 /// Classes exclusive to QClass.
-pub const QClassOnly = enum (u16) {
+pub const QClassOnly = enum(u16) {
     /// Any Class
     @"*" = 255,
 };
@@ -662,9 +662,10 @@ pub const DomainName = struct {
             labels.deinit();
         }
         outer: while (true) {
-            switch (@intToEnum(Label.Options, header_byte >> 6)) {
+            const label_options: Label.Options = @enumFromInt(header_byte >> 6);
+            switch (label_options) {
                 .text => {
-                    const header = @bitCast(Label.TextHeader, header_byte);
+                    const header: Label.TextHeader = @bitCast(header_byte);
                     if (header.length == 0) {
                         break :outer;
                     }
@@ -680,11 +681,11 @@ pub const DomainName = struct {
                     try labels.append(label);
                 },
                 .compressed => {
-                    const header = @bitCast(Label.TextHeader, header_byte);
+                    const header: Label.TextHeader = @bitCast(header_byte);
                     const pointer_end = try reader.readByte();
                     // XXX Different on big-endian systems?
                     const components = Label.PointerComponents{ .upper = header.length, .lower = pointer_end };
-                    const pointer = @bitCast(Label.Pointer, components);
+                    const pointer: Label.Pointer = @bitCast(components);
                     const label = Label{
                         .compressed = pointer,
                     };
@@ -717,21 +718,18 @@ pub const DomainName = struct {
                     if (text.len > std.math.maxInt(Label.Length)) {
                         return error.LabelTooLong;
                     }
-                    const header = Label.TextHeader{
-                        .length = @intCast(u6, text.len),
-                        .options = .text
-                    };
-                    const header_byte = @bitCast(u8, header);
+                    const header = Label.TextHeader{ .length = @intCast(text.len), .options = .text };
+                    const header_byte: u8 = @bitCast(header);
                     try writer.writeByte(header_byte);
                     try writer.writeAll(text);
                 },
                 .compressed => |pointer| {
-                    const pointer_components = @bitCast(Label.PointerComponents, pointer);
+                    const pointer_components: Label.PointerComponents = @bitCast(pointer);
                     const header = Label.TextHeader{
                         .length = pointer_components.upper,
                         .options = .compressed,
                     };
-                    const header_byte = @bitCast(u8, header);
+                    const header_byte: u8 = @bitCast(header);
                     try writer.writeByte(header_byte);
                     try writer.writeByte(pointer_components.lower);
                 },
@@ -790,7 +788,7 @@ pub const DomainName = struct {
                 },
                 .compressed => |pointer| {
                     var writer = string.writer();
-                    try writer.print("Pointer<{d}>", .{ pointer });
+                    try writer.print("Pointer<{d}>", .{pointer});
                 },
             }
         }
@@ -807,14 +805,13 @@ pub const DomainName = struct {
                     if (text.len == 0) {
                         continue;
                     }
-                    try writer.print("{s}.", .{ text });
+                    try writer.print("{s}.", .{text});
                 },
                 .compressed => |pointer| {
-                    try writer.print("Pointer<{d}>", .{ pointer });
+                    try writer.print("Pointer<{d}>", .{pointer});
                 },
             }
         }
-
     }
 
     pub fn deinit(self: *const DomainName) void {
@@ -837,7 +834,6 @@ pub const DomainName = struct {
                     .text => |text| allocator.free(text),
                     .compressed => {},
                 }
-
             }
             labels.deinit();
         }
@@ -898,10 +894,10 @@ pub const DomainName = struct {
     pub const Label = union(enum) {
         text: []const u8,
         compressed: Pointer,
-            // Little bit endian packed struct
-            pub const TextHeader = packed struct {
-                length: Length,
-                options: Options,
+        // Little bit endian packed struct
+        pub const TextHeader = packed struct {
+            length: Length,
+            options: Options,
         };
 
         pub const Options = enum(u2) {
@@ -951,7 +947,7 @@ pub const ResourceData = union(enum) {
     minfo: MINFO,
     mr: MR,
     mx: MX,
-    @"null": NULL,
+    null: NULL,
     ns: NS,
     ptr: PTR,
     soa: SOA,
@@ -983,7 +979,7 @@ pub const ResourceData = union(enum) {
             .MINFO => ResourceData{ .minfo   = try   MINFO.from_reader(allocator, reader, size) },
             .MR    => ResourceData{ .mr      = try      MR.from_reader(allocator, reader, size) },
             .MX    => ResourceData{ .mx      = try      MX.from_reader(allocator, reader, size) },
-            .NULL  => ResourceData{ .@"null" = try    NULL.from_reader(allocator, reader, size) },
+            .NULL  => ResourceData{ .null    = try    NULL.from_reader(allocator, reader, size) },
             .NS    => ResourceData{ .ns      = try      NS.from_reader(allocator, reader, size) },
             .PTR   => ResourceData{ .ptr     = try     PTR.from_reader(allocator, reader, size) },
             .SOA   => ResourceData{ .soa     = try     SOA.from_reader(allocator, reader, size) },
@@ -1015,10 +1011,9 @@ pub const ResourceData = union(enum) {
         _ = fmt;
         _ = options;
         switch (self.*) {
-            inline else => |resource| try writer.print("{}", .{ resource }),
+            inline else => |resource| try writer.print("{}", .{resource}),
         }
     }
-
 
     pub const CNAME = struct {
         /// A domain name which specifies the canonical or primary name
@@ -1043,7 +1038,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{}", .{ self.cname });
+            try writer.print("{}", .{self.cname});
         }
 
         pub fn decompress(self: CNAME, allocator: mem.Allocator, packet: []const u8) !CNAME {
@@ -1058,7 +1053,7 @@ pub const ResourceData = union(enum) {
         /// A string which specifies the CPU type.
         cpu: []const u8,
         /// A string which specifies the operating system type.
-        os:  []const u8,
+        os: []const u8,
 
         pub fn to_writer(self: *const HINFO, writer: anytype) !void {
             if (self.cpu.len > 255) {
@@ -1067,9 +1062,9 @@ pub const ResourceData = union(enum) {
             if (self.os.len > 255) {
                 return error.OsStringTooLong;
             }
-            try writer.writeByte(@intCast(u8, self.cpu.len));
+            try writer.writeByte(@intCast(self.cpu.len));
             try writer.writeAll(self.cpu);
-            try writer.writeByte(@intCast(u8, self.os.len));
+            try writer.writeByte(@intCast(self.os.len));
             try writer.writeAll(self.os);
         }
 
@@ -1141,7 +1136,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{}", .{ self.madname });
+            try writer.print("{}", .{self.madname});
         }
 
         pub fn decompress(self: MB, allocator: mem.Allocator, packet: []const u8) !MB {
@@ -1175,7 +1170,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{}", .{ self.madname });
+            try writer.print("{}", .{self.madname});
         }
 
         pub fn decompress(self: MD, allocator: mem.Allocator, packet: []const u8) !MD {
@@ -1209,7 +1204,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{}", .{ self.madname });
+            try writer.print("{}", .{self.madname});
         }
 
         pub fn decompress(self: MF, allocator: mem.Allocator, packet: []const u8) !MF {
@@ -1242,7 +1237,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{}", .{ self.madname });
+            try writer.print("{}", .{self.madname});
         }
 
         pub fn decompress(self: MG, allocator: mem.Allocator, packet: []const u8) !MG {
@@ -1326,7 +1321,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{}", .{ self.madname });
+            try writer.print("{}", .{self.madname});
         }
 
         pub fn decompress(self: MR, allocator: mem.Allocator, packet: []const u8) !MR {
@@ -1404,7 +1399,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{s}", .{ std.fmt.fmtSliceHexUpper(self.data) });
+            try writer.print("{s}", .{std.fmt.fmtSliceHexUpper(self.data)});
         }
 
         pub fn decompress(self: NULL, allocator: mem.Allocator, _: []const u8) !NULL {
@@ -1438,7 +1433,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{}", .{ self.nsdname });
+            try writer.print("{}", .{self.nsdname});
         }
 
         pub fn decompress(self: NS, allocator: mem.Allocator, packet: []const u8) !NS {
@@ -1471,7 +1466,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{}", .{ self.ptrdname });
+            try writer.print("{}", .{self.ptrdname});
         }
 
         pub fn decompress(self: PTR, allocator: mem.Allocator, packet: []const u8) !PTR {
@@ -1545,7 +1540,7 @@ pub const ResourceData = union(enum) {
                 \\        Expire: {d}
                 \\        Minumum: {d}
                 \\      }}
-                , .{ self.mname, self.rname, self.serial, self.refresh, self.retry, self.expire, self.minimum });
+            , .{ self.mname, self.rname, self.serial, self.refresh, self.retry, self.expire, self.minimum });
         }
 
         pub fn decompress(self: SOA, allocator: mem.Allocator, packet: []const u8) !SOA {
@@ -1561,7 +1556,6 @@ pub const ResourceData = union(enum) {
                 .minimum = self.minimum,
             };
         }
-
     };
 
     pub const TXT = struct {
@@ -1574,7 +1568,7 @@ pub const ResourceData = union(enum) {
                 if (txt.len > 255) {
                     return error.TxtTooLong;
                 }
-                try writer.writeByte(@intCast(u8, txt.len));
+                try writer.writeByte(@intCast(txt.len));
                 try writer.writeAll(txt);
             }
         }
@@ -1617,7 +1611,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
             for (self.txt_data) |txt| {
-                try writer.print("\"{s}\"", .{ txt });
+                try writer.print("\"{s}\"", .{txt});
             }
         }
 
@@ -1671,7 +1665,6 @@ pub const ResourceData = union(enum) {
         pub fn decompress(self: A, _: mem.Allocator, _: []const u8) !A {
             return self;
         }
-
     };
 
     pub const WKS = struct {
@@ -1718,9 +1711,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("Address: {d}.{d}.{d}.{d}, Protocol: {d}, Bitmap: {s}",
-                             .{ self.address[0], self.address[1], self.address[2], self.address[3],
-                                self.protocol, std.fmt.fmtSliceEscapeUpper(self.bit_map) });
+            try writer.print("Address: {d}.{d}.{d}.{d}, Protocol: {d}, Bitmap: {s}", .{ self.address[0], self.address[1], self.address[2], self.address[3], self.protocol, std.fmt.fmtSliceEscapeUpper(self.bit_map) });
         }
 
         pub fn decompress(self: WKS, allocator: mem.Allocator, _: []const u8) !WKS {
@@ -1731,7 +1722,6 @@ pub const ResourceData = union(enum) {
                 .bit_map = try allocator.dupe(u8, self.bit_map),
             };
         }
-
     };
 
     pub const Unknown = struct {
@@ -1763,7 +1753,7 @@ pub const ResourceData = union(enum) {
             _ = fmt;
             _ = options;
 
-            try writer.print("{s}", .{ std.fmt.fmtSliceEscapeUpper(self.data) });
+            try writer.print("{s}", .{std.fmt.fmtSliceEscapeUpper(self.data)});
         }
 
         pub fn decompress(self: Unknown, allocator: mem.Allocator, _: []const u8) !Unknown {
@@ -1792,7 +1782,7 @@ pub const ResourceData = union(enum) {
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !RP {
             var counting_reader = io.countingReader(reader);
             const mbox = try DomainName.from_reader(allocator, counting_reader.reader());
-            const txt = try allocator.alloc(u8, size - @intCast(u16, counting_reader.bytes_read));
+            const txt = try allocator.alloc(u8, size - @as(u16, @intCast(counting_reader.bytes_read)));
             errdefer allocator.free(txt);
             const txt_length = try reader.readAll(txt);
             if (txt_length + counting_reader.bytes_read < size) {
@@ -1920,7 +1910,7 @@ pub const ResourceData = union(enum) {
                 \\        Port: {d}
                 \\        Target: {}
                 \\      }}
-                , .{ self.priority, self.weight, self.port, self.target });
+            , .{ self.priority, self.weight, self.port, self.target });
         }
 
         pub fn decompress(self: SRV, allocator: mem.Allocator, packet: []const u8) !SRV {
@@ -1931,7 +1921,6 @@ pub const ResourceData = union(enum) {
                 .target = try self.target.decompress(allocator, packet),
             };
         }
-
     };
 
     pub const SSHFP = struct {
@@ -1958,14 +1947,14 @@ pub const ResourceData = union(enum) {
         };
 
         pub fn to_writer(self: *const SSHFP, writer: anytype) !void {
-            try writer.writeByte(@enumToInt(self.algorithm));
-            try writer.writeByte(@enumToInt(self.fingerprint_type));
+            try writer.writeByte(@intFromEnum(self.algorithm));
+            try writer.writeByte(@intFromEnum(self.fingerprint_type));
             try writer.writeAll(self.fingerprint);
         }
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !SSHFP {
-            const algorithm = @intToEnum(Algorithm, try reader.readByte());
-            const fingerprint_type = @intToEnum(FingerprintType, try reader.readByte());
+            const algorithm: Algorithm = @enumFromInt(try reader.readByte());
+            const fingerprint_type: FingerprintType = @enumFromInt(try reader.readByte());
             var fingerprint = try allocator.alloc(u8, size - 2);
             errdefer allocator.free(fingerprint);
             const length = try reader.readAll(fingerprint);
@@ -2000,7 +1989,6 @@ pub const ResourceData = union(enum) {
                 .fingerprint = try allocator.dupe(u8, self.fingerprint),
             };
         }
-
     };
 
     pub const URI = struct {
@@ -2114,7 +2102,7 @@ pub const ResourceData = union(enum) {
         /// relative to the [WGS 84] ellipsoid.
         altitude: u32,
 
-        pub const PrecisionSize = packed struct (u8) {
+        pub const PrecisionSize = packed struct(u8) {
             /// The power of ten by which to multiply the base.
             power: u4,
             base: u4,
@@ -2124,8 +2112,8 @@ pub const ResourceData = union(enum) {
                 const base = n / std.math.pow(u32, 10, power);
 
                 return .{
-                    .power = @intCast(u4, power),
-                    .base = @intCast(u4, base),
+                    .power = @intCast(power),
+                    .base = @intCast(base),
                 };
             }
 
@@ -2169,9 +2157,9 @@ pub const ResourceData = union(enum) {
             const degrees = latitude;
 
             return .{
-                .degrees = @intCast(u8, degrees),
-                .minutes = @intCast(u8, minutes),
-                .seconds = @intCast(u8, seconds),
+                .degrees = @intCast(degrees),
+                .minutes = @intCast(minutes),
+                .seconds = @intCast(seconds),
                 .fraction_seconds = fraction_seconds,
                 .direction = direction,
             };
@@ -2195,9 +2183,9 @@ pub const ResourceData = union(enum) {
             const degrees = longitude;
 
             return .{
-                .degrees = @intCast(u8, degrees),
-                .minutes = @intCast(u8, minutes),
-                .seconds = @intCast(u8, seconds),
+                .degrees = @intCast(degrees),
+                .minutes = @intCast(minutes),
+                .seconds = @intCast(seconds),
                 .fraction_seconds = fraction_seconds,
                 .direction = direction,
             };
@@ -2205,14 +2193,14 @@ pub const ResourceData = union(enum) {
 
         /// Relative to sea level / WGS 84, in centimeters
         pub fn getAltitude(self: *const LOC) i32 {
-            return reference_altitude - @intCast(i32, self.altitude);
+            return reference_altitude - @as(i32, @intCast(self.altitude));
         }
 
         pub fn to_writer(self: *const LOC, writer: anytype) !void {
             try writer.writeByte(self.version);
-            try writer.writeByte(@bitCast(u8, self.size));
-            try writer.writeByte(@bitCast(u8, self.horizontal_precision));
-            try writer.writeByte(@bitCast(u8, self.vertical_precision));
+            try writer.writeByte(@bitCast(self.size));
+            try writer.writeByte(@bitCast(self.horizontal_precision));
+            try writer.writeByte(@bitCast(self.vertical_precision));
             try writer.writeIntBig(u32, self.latitude);
             try writer.writeIntBig(u32, self.longitude);
             try writer.writeIntBig(u32, self.altitude);
@@ -2220,9 +2208,9 @@ pub const ResourceData = union(enum) {
 
         pub fn from_reader(_: mem.Allocator, reader: anytype, _: u16) !LOC {
             const version = try reader.readByte();
-            const size = @bitCast(PrecisionSize, try reader.readByte());
-            const horizontal_precision = @bitCast(PrecisionSize, try reader.readByte());
-            const vertical_prevision = @bitCast(PrecisionSize, try reader.readByte());
+            const size: PrecisionSize = @bitCast(try reader.readByte());
+            const horizontal_precision: PrecisionSize = @bitCast(try reader.readByte());
+            const vertical_prevision: PrecisionSize = @bitCast(try reader.readByte());
             const latitude = try reader.readIntBig(u32);
             const longitude = try reader.readIntBig(u32);
             const altitude = try reader.readIntBig(u32);
@@ -2254,15 +2242,14 @@ fn listDeinit(list: anytype) void {
     list.deinit();
 }
 
-
 fn formatTagName(value: anytype, writer: anytype) !void {
     inline for (comptime std.enums.values(@TypeOf(value))) |val| {
         if (value == val) {
-            try writer.print("{s}", .{ @tagName(value) });
+            try writer.print("{s}", .{@tagName(value)});
             return;
         }
     }
-    try writer.print("{d}", .{ @enumToInt(value) });
+    try writer.print("{d}", .{@intFromEnum(value)});
 }
 
 test "ref all decls" {

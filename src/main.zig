@@ -35,16 +35,16 @@ pub fn main() anyerror!void {
     var message_bytes = try message.to_bytes(allocator);
     defer allocator.free(message_bytes);
 
-    std.debug.print("Sending bytes: {any}\n", .{ message_bytes });
-    std.debug.print("Query:\n {}", .{ message });
+    std.debug.print("Sending bytes: {any}\n", .{message_bytes});
+    std.debug.print("Query:\n {}", .{message});
 
     try writer.writeAll(message_bytes);
     var recv = [_]u8{0} ** 1024;
     const recv_size = try sock.receive(&recv);
     const response_bytes = recv[0..recv_size];
 
-    std.debug.print("Recv: {any}\n", .{ response_bytes });
+    std.debug.print("Recv: {any}\n", .{response_bytes});
     const response = try dns.Message.from_bytes(allocator, response_bytes);
     defer response.deinit();
-    std.debug.print("Response:\n{any}\n", .{ response });
+    std.debug.print("Response:\n{any}\n", .{response});
 }
