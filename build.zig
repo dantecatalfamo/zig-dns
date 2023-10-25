@@ -14,6 +14,15 @@ pub fn build(b: *std.Build) void {
     exe.addModule("network", zig_network);
     b.installArtifact(exe);
 
+    const iter = b.addExecutable(.{
+        .name = "iterative",
+        .root_source_file = .{ .path = "src/iterative.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    iter.addModule("network", zig_network);
+    b.installArtifact(iter);
+
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
 
