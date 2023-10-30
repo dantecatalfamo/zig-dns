@@ -181,7 +181,7 @@ pub const Message = struct {
             try writer.print("{any}", .{question});
         }
         try writer.print("  }}\n", .{});
-        try writer.print("  Ansewrs {{\n", .{});
+        try writer.print("  Answers {{\n", .{});
         for (self.answers) |answer| {
             try writer.print("{any}", .{answer});
         }
