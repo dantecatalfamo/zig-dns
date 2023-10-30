@@ -152,7 +152,7 @@ try writer.writeAll(message_bytes);
 var recv = [_]u8{0} ** 1024;
 const recv_size = try sock.receive(&recv);
 
-const response = try Message.from_bytes(recv[0..recv_size]);
+const response = try dns.Message.from_bytes(allocator, recv[0..recv_size]);
 defer response.deinit();
 
 std.debug.print("Response:\n{any}\n", .{ response });
