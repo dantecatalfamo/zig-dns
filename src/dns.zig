@@ -165,7 +165,7 @@ pub const Message = struct {
             const addit = try ResourceRecord.from_reader(allocator, reader);
             if (addit.type == Type.OPT) {
                 const flags = addit.ttl;
-                const mask: u32 = 0x8000;
+                const mask: u32 = 0x8000; // Using a packed struct may be more ziggist.
                 var do: bool = false;
                 if ((flags & mask) == mask) {
                     do = true;
