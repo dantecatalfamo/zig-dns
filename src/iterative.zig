@@ -68,7 +68,7 @@ pub fn makeNonRecursiveQuery(allocator: mem.Allocator, name_server: []const u8, 
     defer message.deinit();
     message.header.recursion_desired = false;
 
-    var message_bytes = try message.to_bytes(allocator);
+    const message_bytes = try message.to_bytes(allocator);
     defer allocator.free(message_bytes);
 
     try writer.writeAll(message_bytes);

@@ -32,7 +32,7 @@ pub fn main() anyerror!void {
     const message = try dns.createQuery(allocator, domain, std.meta.stringToEnum(dns.QType, query_type) orelse usage());
     defer message.deinit();
 
-    var message_bytes = try message.to_bytes(allocator);
+    const message_bytes = try message.to_bytes(allocator);
     defer allocator.free(message_bytes);
 
     std.debug.print("Sending bytes: {any}\n", .{message_bytes});
