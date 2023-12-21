@@ -52,6 +52,50 @@ pub fn createQuery(allocator: mem.Allocator, address: []const u8, qtype: QType) 
     return message;
 }
 
+pub const EDNS = struct {
+    bufsize: u16 = 1232,
+    do_dnssec: bool = true,
+    // In the future, EDNS options will come here
+
+    pub fn format(self: *const EDNS, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
+        _ = fmt; // We don't use these two parameters
+        _ = options;
+        try writer.print("  EDNS {{\n", .{});
+        try writer.print("    Payload size: {d}\n", .{self.bufsize});
+        try writer.print("    Do DNSSEC: {any}\n", .{self.do_dnssec});
+        try writer.print("  }}\n", .{});
+    }
+};
+
+pub const PackedEDNSTTL = packed struct(u32) {
+    z2: u8 = 0,
+    z1: u7 = 0, // Zig put fields in the unexpected order inside a byte.
+    do: bool = true,
+    version: u8 = 0, // EDNS version 0 (RFC 6891)
+    extendedRcode: u8 = 0,
+};
+
+pub fn createEDNSQuery(allocator: mem.Allocator, address: []const u8, qtype: QType, edns: EDNS) !Message {
+    var result = try createQuery(allocator, address, qtype);
+    result.header.additional_record_count += 1;
+    const domain = try DomainName.from_string(allocator, ".");
+    var flags = PackedEDNSTTL{};
+    flags.do = edns.do_dnssec;
+    const rr: ResourceRecord = .{
+        .name = domain,
+        .type = Type.OPT,
+        .class = @enumFromInt(edns.bufsize),
+        .ttl = @as(i32, @bitCast(flags)),
+        .resource_data_length = 0, // We do not yet handle EDNS options ({attribute,value} pairs)
+        .resource_data = ResourceData{ .null = undefined },
+    };
+    var rrset = ResourceRecordList.init(allocator);
+    defer listDeinit(rrset);
+    try rrset.append(rr);
+    result.additional = try rrset.toOwnedSlice();
+    return result;
+}
+
 /// DNS Message. All communications inside of the domain protocol are
 /// carried in a single format called a message.
 pub const Message = struct {
@@ -59,6 +103,8 @@ pub const Message = struct {
     /// Contains information about the message. The header section is
     /// always present
     header: Header,
+    // EDNS information
+    edns: ?EDNS = null,
     /// The question(s) being asked in the query. This section usually
     /// contains one question.
     questions: []const Question,
@@ -120,14 +166,21 @@ pub const Message = struct {
         errdefer listDeinit(additional);
 
         var add_idx: usize = 0;
+        var edns: ?EDNS = null;
         while (add_idx < header.additional_record_count) : (add_idx += 1) {
             const addit = try ResourceRecord.from_reader(allocator, reader);
-            try additional.append(addit);
+            if (addit.type == Type.OPT) {
+                const flags: PackedEDNSTTL = @as(PackedEDNSTTL, @bitCast(addit.ttl));
+                const do: bool = flags.do;
+                edns = .{ .bufsize = @intFromEnum(addit.class), .do_dnssec = do };
+            } else {
+                try additional.append(addit);
+            }
         }
-
         return Message{
             .allocator = allocator,
             .header = header,
+            .edns = edns,
             .questions = try questions.toOwnedSlice(),
             .answers = try answers.toOwnedSlice(),
             .authorities = try authorities.toOwnedSlice(),
@@ -176,6 +229,9 @@ pub const Message = struct {
         _ = options;
         try writer.print("Message {{\n", .{});
         try writer.print("{any}", .{self.header});
+        if (self.edns != null) {
+            try writer.print("{any}", .{self.edns});
+        }
         try writer.print("  Questions {{\n", .{});
         for (self.questions) |question| {
             try writer.print("{any}", .{question});
@@ -238,6 +294,7 @@ pub const Message = struct {
         const message = Message{
             .allocator = self.allocator,
             .header = self.header,
+            .edns = self.edns,
             .questions = try questions.toOwnedSlice(),
             .answers = try answers.toOwnedSlice(),
             .authorities = try authorities.toOwnedSlice(),
@@ -532,7 +589,7 @@ pub const ResourceRecord = struct {
     }
 };
 
-/// DNS Resource Record types
+/// DNS Resource Record types https://www.iana.org/assignments/dns-parameters/dns-parameters.xml#dns-parameters-4
 pub const Type = enum(u16) {
     /// A host address
     A = 1,
@@ -574,6 +631,8 @@ pub const Type = enum(u16) {
     LOC = 29,
     /// Service locator
     SRV = 33,
+    // EDNS record
+    OPT = 41,
     /// SSH Fingerprint
     SSHFP = 44,
     /// Uniform Resource Identifier
@@ -618,6 +677,7 @@ pub const Class = enum(u16) {
     CH = 3,
     /// Hesiod [Dyer 87]
     HS = 4,
+    _, // Non-exhaustive enums for EDNS, where "class" is the payload size
 
     pub fn format(self: Class, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
         _ = fmt;
