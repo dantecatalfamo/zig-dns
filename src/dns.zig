@@ -56,7 +56,7 @@ pub const EDNS = struct {
     bufsize: u16 = 1232,
     do_dnssec: bool = true,
     // In the future, EDNS options will come here
-    
+
     pub fn format(self: *const EDNS, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
         _ = fmt; // We don't use these two parameters
         _ = options;
@@ -67,26 +67,32 @@ pub const EDNS = struct {
     }
 };
 
+pub const PackedEDNSTTL = packed struct(u32) {
+    z2: u8 = 0,
+    z1: u7 = 0, // Zig put fields in the unexpected order inside a byte.
+    do: bool = true,
+    version: u8 = 0, // EDNS version 0 (RFC 6891)
+    extendedRcode: u8 = 0,
+};
+
 pub fn createEDNSQuery(allocator: mem.Allocator, address: []const u8, qtype: QType, edns: EDNS) !Message {
     var result = try createQuery(allocator, address, qtype);
     result.header.additional_record_count += 1;
     const domain = try DomainName.from_string(allocator, ".");
-    var flags: i32 = 0; // EDNS version 0 (RFC 6891)
-    if (edns.do_dnssec) {
-        flags = 0x8000;
-    }
-    var rr: ResourceRecord = .{
+    var flags = PackedEDNSTTL{};
+    flags.do = edns.do_dnssec;
+    const rr: ResourceRecord = .{
         .name = domain,
         .type = Type.OPT,
         .class = @enumFromInt(edns.bufsize),
-        .ttl = flags,
+        .ttl = @as(i32, @bitCast(flags)),
         .resource_data_length = 0, // We do not yet handle EDNS options ({attribute,value} pairs)
-        .resource_data = ResourceData{.null = undefined},
-    }; 
+        .resource_data = ResourceData{ .null = undefined },
+    };
     var rrset = ResourceRecordList.init(allocator);
     defer listDeinit(rrset);
     try rrset.append(rr);
-    result.additional = try rrset.toOwnedSlice(); 
+    result.additional = try rrset.toOwnedSlice();
     return result;
 }
 
@@ -164,13 +170,9 @@ pub const Message = struct {
         while (add_idx < header.additional_record_count) : (add_idx += 1) {
             const addit = try ResourceRecord.from_reader(allocator, reader);
             if (addit.type == Type.OPT) {
-                const flags = addit.ttl;
-                const mask: u32 = 0x8000; // Using a packed struct may be more ziggist.
-                var do: bool = false;
-                if ((flags & mask) == mask) {
-                    do = true;
-                }
-                edns = .{.bufsize = @intFromEnum(addit.class), .do_dnssec = do};
+                const flags: PackedEDNSTTL = @as(PackedEDNSTTL, @bitCast(addit.ttl));
+                const do: bool = flags.do;
+                edns = .{ .bufsize = @intFromEnum(addit.class), .do_dnssec = do };
             } else {
                 try additional.append(addit);
             }
@@ -676,7 +678,7 @@ pub const Class = enum(u16) {
     /// Hesiod [Dyer 87]
     HS = 4,
     _, // Non-exhaustive enums for EDNS, where "class" is the payload size
-    
+
     pub fn format(self: Class, comptime fmt: []const u8, options: std.fmt.FormatOptions, writer: anytype) @TypeOf(writer).Error!void {
         _ = fmt;
         _ = options;
