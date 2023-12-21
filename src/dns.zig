@@ -127,7 +127,7 @@ pub const Message = struct {
 
     /// Not decompressed
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Message {
-        var header = try Header.from_reader(reader);
+        const header = try Header.from_reader(reader);
 
         var questions = QuestionList.init(allocator);
         errdefer listDeinit(questions);
@@ -189,7 +189,7 @@ pub const Message = struct {
     /// Automatically decompressed
     pub fn from_bytes(allocator: mem.Allocator, bytes: []const u8) !Message {
         var buffer = io.fixedBufferStream(bytes);
-        var reader = buffer.reader();
+        const reader = buffer.reader();
         const message = try Message.from_reader(allocator, reader);
         defer message.deinit();
         const decompressed = try message.decompress(allocator, bytes);
@@ -198,7 +198,7 @@ pub const Message = struct {
 
     pub fn to_bytes(self: *const Message, allocator: mem.Allocator) ![]const u8 {
         var bytes = std.ArrayList(u8).init(allocator);
-        var writer = bytes.writer();
+        const writer = bytes.writer();
         try self.to_writer(writer);
         return bytes.toOwnedSlice();
     }
@@ -388,7 +388,7 @@ pub const Header = packed struct(u96) {
             return error.NotEnoughBytes;
         }
         var header: Header = @bitCast(bytes);
-        if (builtin.cpu.arch.endian() == .Big) {
+        if (builtin.cpu.arch.endian() == .big) {
             return header;
         }
         header.id = @byteSwap(header.id);
@@ -401,7 +401,7 @@ pub const Header = packed struct(u96) {
 
     pub fn to_bytes(self: *const Header) [12]u8 {
         var header = self.*;
-        if (builtin.cpu.arch.endian() == .Big) {
+        if (builtin.cpu.arch.endian() == .big) {
             return @bitCast(header);
         }
         header.id = @byteSwap(header.id);
@@ -467,14 +467,14 @@ pub const Question = struct {
 
     pub fn to_writer(self: *const Question, writer: anytype) !void {
         try self.qname.to_writer(writer);
-        try writer.writeIntBig(u16, @intFromEnum(self.qtype));
-        try writer.writeIntBig(u16, @intFromEnum(self.qclass));
+        try writer.writeInt(u16, @intFromEnum(self.qtype), .big);
+        try writer.writeInt(u16, @intFromEnum(self.qclass), .big);
     }
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !Question {
         const qname = try DomainName.from_reader(allocator, reader);
-        var qtype = try reader.readIntBig(u16);
-        var qclass = try reader.readIntBig(u16);
+        const qtype = try reader.readInt(u16, .big);
+        const qclass = try reader.readInt(u16, .big);
 
         return Question{
             .qname = qname,
@@ -524,20 +524,20 @@ pub const ResourceRecord = struct {
         try self.resource_data.to_writer(resource_data_stream.writer());
 
         try self.name.to_writer(writer);
-        try writer.writeIntBig(u16, @intFromEnum(self.type));
-        try writer.writeIntBig(u16, @intFromEnum(self.class));
-        try writer.writeIntBig(i32, self.ttl);
-        try writer.writeIntBig(u16, @as(u16, @intCast(try resource_data_stream.getPos())));
+        try writer.writeInt(u16, @intFromEnum(self.type), .big);
+        try writer.writeInt(u16, @intFromEnum(self.class), .big);
+        try writer.writeInt(i32, self.ttl, .big);
+        try writer.writeInt(u16, @as(u16, @intCast(try resource_data_stream.getPos())), .big);
         try writer.writeAll(resource_data_stream.getWritten());
     }
 
     pub fn from_reader(allocator: mem.Allocator, reader: anytype) !ResourceRecord {
         const name = try DomainName.from_reader(allocator, reader);
         errdefer name.deinit();
-        const resource_type: Type = @enumFromInt(try reader.readIntBig(u16));
-        const class: Class = @enumFromInt(try reader.readIntBig(u16));
-        const ttl = try reader.readIntBig(i32);
-        const resource_data_length = try reader.readIntBig(u16);
+        const resource_type: Type = @enumFromInt(try reader.readInt(u16, .big));
+        const class: Class = @enumFromInt(try reader.readInt(u16, .big));
+        const ttl = try reader.readInt(i32, .big);
+        const resource_data_length = try reader.readInt(u16, .big);
         var counting_reader = io.countingReader(reader);
         const resource_data = try ResourceData.from_reader(allocator, counting_reader.reader(), resource_type, resource_data_length);
         if (counting_reader.bytes_read != resource_data_length) {
@@ -727,7 +727,7 @@ pub const DomainName = struct {
                     if (header.length == 0) {
                         break :outer;
                     }
-                    var string = try allocator.alloc(u8, header.length);
+                    const string = try allocator.alloc(u8, header.length);
                     errdefer allocator.free(string);
                     const string_length = try reader.readAll(string);
                     if (string_length < header.length) {
@@ -918,7 +918,7 @@ pub const DomainName = struct {
                 return error.CompressionDepth;
             }
             var buffer = io.fixedBufferStream(packet);
-            var reader = buffer.reader();
+            const reader = buffer.reader();
             buffer.pos = valid_pointer;
             const domain = try DomainName.from_reader(allocator, reader);
             defer domain.deinit();
@@ -1049,7 +1049,7 @@ pub const ResourceData = union(enum) {
             .LOC   => ResourceData{ .loc     = try     LOC.from_reader(allocator, reader, size) },
             .SRV   => ResourceData{ .srv     = try     SRV.from_reader(allocator, reader, size) },
             .SSHFP => ResourceData{ .sshfp   = try   SSHFP.from_reader(allocator, reader, size) },
-            else   => ResourceData{ .unknown = try Unknown.from_reader(allocator, reader, size) },
+            else => ResourceData{ .unknown   = try Unknown.from_reader(allocator, reader, size) },
         };
     }
 
@@ -1398,13 +1398,13 @@ pub const ResourceData = union(enum) {
         exchange: DomainName,
 
         pub fn to_writer(self: *const MX, writer: anytype) !void {
-            try writer.writeIntBig(u16, self.preference);
+            try writer.writeInt(u16, self.preference, .big);
             try self.exchange.to_writer(writer);
         }
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !MX {
             return .{
-                .preference = try reader.readIntBig(u16),
+                .preference = try reader.readInt(u16, .big),
                 .exchange = try DomainName.from_reader(allocator, reader),
             };
         }
@@ -1437,7 +1437,7 @@ pub const ResourceData = union(enum) {
         }
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !NULL {
-            var data = try allocator.alloc(u8, size);
+            const data = try allocator.alloc(u8, size);
             errdefer allocator.free(data);
             const len = try reader.readAll(data);
             if (len < size) {
@@ -1560,22 +1560,22 @@ pub const ResourceData = union(enum) {
         pub fn to_writer(self: *const SOA, writer: anytype) !void {
             try self.mname.to_writer(writer);
             try self.rname.to_writer(writer);
-            try writer.writeIntBig(u32, self.serial);
-            try writer.writeIntBig(i32, self.refresh);
-            try writer.writeIntBig(i32, self.retry);
-            try writer.writeIntBig(i32, self.expire);
-            try writer.writeIntBig(u32, self.minimum);
+            try writer.writeInt(u32, self.serial, .big);
+            try writer.writeInt(i32, self.refresh, .big);
+            try writer.writeInt(i32, self.retry, .big);
+            try writer.writeInt(i32, self.expire, .big);
+            try writer.writeInt(u32, self.minimum, .big);
         }
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !SOA {
             return .{
                 .mname = try DomainName.from_reader(allocator, reader),
                 .rname = try DomainName.from_reader(allocator, reader),
-                .serial = try reader.readIntBig(u32),
-                .refresh = try reader.readIntBig(i32),
-                .retry = try reader.readIntBig(i32),
-                .expire = try reader.readIntBig(i32),
-                .minimum = try reader.readIntBig(u32),
+                .serial = try reader.readInt(u32, .big),
+                .refresh = try reader.readInt(i32, .big),
+                .retry = try reader.readInt(i32, .big),
+                .expire = try reader.readInt(i32, .big),
+                .minimum = try reader.readInt(u32, .big),
             };
         }
 
@@ -1643,7 +1643,7 @@ pub const ResourceData = union(enum) {
 
             var bytes_read: usize = 0;
             while (bytes_read < size) {
-                var txt = try allocator.alloc(u8, try reader.readByte());
+                const txt = try allocator.alloc(u8, try reader.readByte());
                 errdefer allocator.free(txt);
                 const txt_len = try reader.readAll(txt);
                 if (txt_len < txt.len) {
@@ -1747,7 +1747,7 @@ pub const ResourceData = union(enum) {
                 return error.EndOfStream;
             }
             const protocol = try reader.readByte();
-            var bit_map = try allocator.alloc(u8, size - 5);
+            const bit_map = try allocator.alloc(u8, size - 5);
             errdefer allocator.free(bit_map);
             const bm_len = try reader.readAll(bit_map);
             if (bm_len + 5 < size) {
@@ -1791,7 +1791,7 @@ pub const ResourceData = union(enum) {
         }
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !Unknown {
-            var data = try allocator.alloc(u8, size);
+            const data = try allocator.alloc(u8, size);
             errdefer allocator.free(data);
             const len = try reader.readAll(data);
             if (len < size) {
@@ -1933,16 +1933,16 @@ pub const ResourceData = union(enum) {
         target: DomainName,
 
         pub fn to_writer(self: *const SRV, writer: anytype) !void {
-            try writer.writeIntBig(u16, self.priority);
-            try writer.writeIntBig(u16, self.weight);
-            try writer.writeIntBig(u16, self.port);
+            try writer.writeInt(u16, self.priority, .big);
+            try writer.writeInt(u16, self.weight, .big);
+            try writer.writeInt(u16, self.port, .big);
             try self.target.to_writer(writer);
         }
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, _: u16) !SRV {
-            const priority = try reader.readIntBig(u16);
-            const weight = try reader.readIntBig(u16);
-            const port = try reader.readIntBig(u16);
+            const priority = try reader.readInt(u16, .big);
+            const weight = try reader.readInt(u16, .big);
+            const port = try reader.readInt(u16, .big);
             const target = try DomainName.from_reader(allocator, reader);
 
             return .{
@@ -2013,7 +2013,7 @@ pub const ResourceData = union(enum) {
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !SSHFP {
             const algorithm: Algorithm = @enumFromInt(try reader.readByte());
             const fingerprint_type: FingerprintType = @enumFromInt(try reader.readByte());
-            var fingerprint = try allocator.alloc(u8, size - 2);
+            const fingerprint = try allocator.alloc(u8, size - 2);
             errdefer allocator.free(fingerprint);
             const length = try reader.readAll(fingerprint);
             if (length + 2 < size) {
@@ -2065,15 +2065,15 @@ pub const ResourceData = union(enum) {
         target: []const u8,
 
         pub fn to_writer(self: *const URI, writer: anytype) !void {
-            try writer.writeIntBig(u16, self.priority);
-            try writer.writeIntBig(u16, self.weight);
+            try writer.writeInt(u16, self.priority, .big);
+            try writer.writeInt(u16, self.weight, .big);
             try writer.writeAll(self.target);
         }
 
         pub fn from_reader(allocator: mem.Allocator, reader: anytype, size: u16) !URI {
-            const priority = try reader.readIntBig(u16);
-            const weight = try reader.readIntBig(u16);
-            var target = allocator.alloc(u8, size - 4);
+            const priority = try reader.readInt(u16, .big);
+            const weight = try reader.readInt(u16, .big);
+            const target = allocator.alloc(u8, size - 4);
             errdefer allocator.free(target);
             const length = try reader.readAll(target);
             if (length + 4 < size) {
@@ -2259,9 +2259,9 @@ pub const ResourceData = union(enum) {
             try writer.writeByte(@bitCast(self.size));
             try writer.writeByte(@bitCast(self.horizontal_precision));
             try writer.writeByte(@bitCast(self.vertical_precision));
-            try writer.writeIntBig(u32, self.latitude);
-            try writer.writeIntBig(u32, self.longitude);
-            try writer.writeIntBig(u32, self.altitude);
+            try writer.writeInt(u32, self.latitude, .big);
+            try writer.writeInt(u32, self.longitude, .big);
+            try writer.writeInt(u32, self.altitude, .big);
         }
 
         pub fn from_reader(_: mem.Allocator, reader: anytype, _: u16) !LOC {
@@ -2269,9 +2269,9 @@ pub const ResourceData = union(enum) {
             const size: PrecisionSize = @bitCast(try reader.readByte());
             const horizontal_precision: PrecisionSize = @bitCast(try reader.readByte());
             const vertical_prevision: PrecisionSize = @bitCast(try reader.readByte());
-            const latitude = try reader.readIntBig(u32);
-            const longitude = try reader.readIntBig(u32);
-            const altitude = try reader.readIntBig(u32);
+            const latitude = try reader.readInt(u32, .big);
+            const longitude = try reader.readInt(u32, .big);
+            const altitude = try reader.readInt(u32, .big);
 
             return .{
                 .version = version,
