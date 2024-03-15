@@ -10,8 +10,8 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    const zig_network = b.createModule(.{ .source_file = .{ .path = "zig-network/network.zig" }});
-    exe.addModule("network", zig_network);
+    const zig_network = b.createModule(.{ .root_source_file = .{ .path = "zig-network/network.zig" }});
+    exe.root_module.addImport("network", zig_network);
     b.installArtifact(exe);
 
     const iter = b.addExecutable(.{
@@ -20,7 +20,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    iter.addModule("network", zig_network);
+    iter.root_module.addImport("network", zig_network);
     b.installArtifact(iter);
 
     const run_cmd = b.addRunArtifact(exe);
